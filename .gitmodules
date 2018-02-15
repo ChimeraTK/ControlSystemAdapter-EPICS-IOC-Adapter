@@ -1,3 +1,6 @@
 [submodule "epics-base"]
 	path = epics-base
 	url = https://git.launchpad.net/epics-base
+[submodule "ChimeraTK-ControlSystemAdapter-EPICS"]
+	path = ChimeraTK-ControlSystemAdapter-EPICS
+	url = https://github.com/aquenos/ChimeraTK-ControlSystemAdapter-EPICS
