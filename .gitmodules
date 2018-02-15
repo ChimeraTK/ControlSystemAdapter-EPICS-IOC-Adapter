@@ -1,0 +1,3 @@
+[submodule "epics-base"]
+	path = epics-base
+	url = https://git.launchpad.net/epics-base
