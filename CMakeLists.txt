@@ -59,7 +59,8 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
 # Install the library and a template directory structure for IOCs
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(FILES ${PROJECT_BINARY_DIR}/ioc/dbd/ChimeraTK.dbd DESTINATION share/${PROJECT_NAME}/iocTemplate/dbd)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/iocBoot/iocChimeraTKApp/st.cmd DESTINATION share/${PROJECT_NAME}/iocTemplate/iocBoot/iocChimeraTKApp)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/iocTemplate/iocBoot/iocChimeraTKApp/st.cmd DESTINATION share/${PROJECT_NAME}/iocTemplate/iocBoot/iocChimeraTKApp)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/iocTemplate/db/readme.txt DESTINATION share/${PROJECT_NAME}/iocTemplate/db)
 
 set(${PROJECT_NAME}_INCLUDE_DIRS "")
 set(${PROJECT_NAME}_LIBRARIES "${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES}")
