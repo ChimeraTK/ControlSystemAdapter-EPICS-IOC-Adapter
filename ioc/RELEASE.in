@@ -31,7 +31,7 @@ CHIMERATK_EPICS=${PROJECT_BINARY_DIR}/adapter
 #SNCSEQ = $(MODULES)/seq-ver
 
 # EPICS_BASE should appear last so earlier modules can override stuff:
-EPICS_BASE = /home/mhier/Downloads/xxx/build/epics-base
+EPICS_BASE = ${PROJECT_BINARY_DIR}/epics-base
 
 # Set RULES here if you want to use build rules from somewhere
 # other than EPICS_BASE:
