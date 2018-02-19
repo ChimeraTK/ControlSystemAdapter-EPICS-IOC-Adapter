@@ -52,3 +52,16 @@ target_link_libraries(${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS} -Wl,--no-as-needed")
 
+# do not remove runtime path of the library when installing
+set_property(TARGET ${PROJECT_NAME} PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+# Install the library and the executables
+install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
+
+set(${PROJECT_NAME}_INCLUDE_DIRS "")
+set(${PROJECT_NAME}_LIBRARIES "${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES}")
+set(${PROJECT_NAME}_LIBRARY_DIRS "${CMAKE_INSTALL_PREFIX}/lib")
+set(${PROJECT_NAME}_CXX_FLAGS "")
+set(${PROJECT_NAME}_LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS}")
+include(${CMAKE_SOURCE_DIR}/cmake/create_cmake_config_files.cmake)
+
