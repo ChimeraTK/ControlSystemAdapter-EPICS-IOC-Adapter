@@ -1,0 +1,31 @@
+# If the Boost libraries are not in one of the system paths, their paths have
+# to be set here.
+
+# BOOST_DIR = /opt/boost_1_55_0
+
+# BOOST_INCLUDE and BOOST_LIB only have to be defined if they do not match
+# $(BOOST_DIR)/include and $(BOOST_DIR)/lib
+
+# BOOST_INCLUDE = $(BOOST_DIR)/include
+# BOOST_LIB = $(BOOST_DIR)/lib
+
+# If the Boost library names have a suffix (e.g. "-mt"), this has to be set
+# here.
+
+# BOOST_LIBNAME_SUFFIX=-mt
+
+# If the ChimeraTK libraries are not in one of the system paths, their paths
+# have to be set here.
+
+# CHIMERATK_DIR = /opt/chimeraTK
+
+# CHIMERATK_INCLUDE and CHIMERATK_LIB only have to be defined if they do not
+# match $(CHIMERATK_DIR)/include and $(CHIMERATK_DIR)/lib
+
+CHIMERATK_INCLUDE = ${ChimeraTK-ControlSystemAdapter_INCLUDE_DIR}
+CHIMERATK_LIB = ${ChimeraTK-ControlSystemAdapter_LIBRARY_DIR}
+
+# If the compiler is not expecting C++ 11 code by default, it has to be told
+# to do so.
+
+USR_CXXFLAGS += ${ChimeraTK-ControlSystemAdapter_CXX_FLAGS}

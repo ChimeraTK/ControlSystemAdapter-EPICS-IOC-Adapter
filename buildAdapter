@@ -1,0 +1,34 @@
+#!/bin/bash -e
+
+ADAPTER_SOURCE="$1"
+PROJECT_BINARY_DIR="`pwd`"
+EPICS_BASE=${PROJECT_BINARY_DIR}/epics-base
+
+EPICS_ARCH=`grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//'`
+
+makeLink() {
+   mkdir -p `dirname "${PROJECT_BINARY_DIR}/adapter/$1"`
+   ln -sfn "${ADAPTER_SOURCE}/$1" "${PROJECT_BINARY_DIR}/adapter/$1"
+}
+export -f makeLink
+export PROJECT_BINARY_DIR
+export ADAPTER_SOURCE
+
+if [ ! -f "${PROJECT_BINARY_DIR}/AdapterSourceLinked" ]; then
+  cd "${ADAPTER_SOURCE}/"
+  echo "Symlinking adapter source..."
+  find -type f -exec bash -c "makeLink {}" \;
+  touch "${PROJECT_BINARY_DIR}/AdapterSourceLinked"
+fi
+
+ln -sfn "${PROJECT_BINARY_DIR}/adapterRELEASE.local" "${PROJECT_BINARY_DIR}/adapter/configure/RELEASE.local"
+ln -sfn "${PROJECT_BINARY_DIR}/adapterCONFIG_SITE.local" "${PROJECT_BINARY_DIR}/adapter/configure/CONFIG_SITE.local"
+
+echo "Starting the adapter build..."
+cd "${PROJECT_BINARY_DIR}/adapter"
+make -j5
+
+mkdir -p "${PROJECT_BINARY_DIR}/libs"
+cp "${PROJECT_BINARY_DIR}/adapter/lib/${EPICS_ARCH}/"*.a "${PROJECT_BINARY_DIR}/libs"
+chmod u+w -R "${PROJECT_BINARY_DIR}/libs"
+

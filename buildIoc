@@ -1,0 +1,25 @@
+#!/bin/bash -e
+
+PROJECT_BINARY_DIR="`pwd`"
+EPICS_BASE=${PROJECT_BINARY_DIR}/epics-base
+
+EPICS_ARCH=`grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//'`
+
+echo "Creating IOC template..."
+mkdir -p "${PROJECT_BINARY_DIR}/ioc"
+cd "${PROJECT_BINARY_DIR}/ioc"
+
+"${EPICS_BASE}/bin/${EPICS_ARCH}/makeBaseApp.pl" -t ioc ChimeraTKApp
+"${EPICS_BASE}/bin/${EPICS_ARCH}/makeBaseApp.pl" -i -t ioc -p ChimeraTKApp ChimeraTKApp
+
+cp "${PROJECT_BINARY_DIR}/iocRELEASE" "${PROJECT_BINARY_DIR}/ioc/configure"
+cp "${PROJECT_BINARY_DIR}/iocSrcMakefile" "${PROJECT_BINARY_DIR}/ioc/ChimeraTKApp/src/Makefile"
+
+echo "Starting the IOC build..."
+make
+
+mkdir -p "${PROJECT_BINARY_DIR}/src"
+cp "${PROJECT_BINARY_DIR}/ioc/ChimeraTKApp/src/"*.cpp "${PROJECT_BINARY_DIR}/src"
+cp "${PROJECT_BINARY_DIR}/ioc/ChimeraTKApp/src/O.${EPICS_ARCH}/"*.cpp "${PROJECT_BINARY_DIR}/src"
+chmod u+w -R "${PROJECT_BINARY_DIR}/src"
+
