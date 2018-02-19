@@ -56,8 +56,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${ChimeraTK-Control
 # do not remove runtime path of the library when installing
 set_property(TARGET ${PROJECT_NAME} PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-# Install the library and the executables
+# Install the library and a template directory structure for IOCs
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
+install(FILES ${PROJECT_BINARY_DIR}/ioc/dbd/ChimeraTK.dbd DESTINATION share/${PROJECT_NAME}/iocTemplate/dbd)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/iocBoot/iocChimeraTKApp/st.cmd DESTINATION share/${PROJECT_NAME}/iocTemplate/iocBoot/iocChimeraTKApp)
 
 set(${PROJECT_NAME}_INCLUDE_DIRS "")
 set(${PROJECT_NAME}_LIBRARIES "${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES}")
