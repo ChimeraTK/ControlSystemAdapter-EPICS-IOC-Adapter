@@ -8,7 +8,7 @@ ChimeraTK_registerRecordDeviceDriver(pdbbase)
 chimeraTKConfigureApplication("ChimeraTKApp", 100)
 
 ## Load record instances
-dbLoadRecords("../../db/<ApplicationName>.db","P=<InstanceName>,APP=<ApplicationName>")
+dbLoadRecords("../../db/<ApplicationName>.db","P=<InstanceName>,APP=ChimeraTKApp")
 
 ## Initialise the IOC
 iocInit()
