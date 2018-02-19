@@ -21,6 +21,7 @@ configure_file(adapter/RELEASE.local.in ${PROJECT_BINARY_DIR}/adapterRELEASE.loc
 # configure files required to build the IOC with the  ControlSystemAdapter-EPICS as device support
 configure_file(ioc/RELEASE.in ${PROJECT_BINARY_DIR}/iocRELEASE)
 configure_file(ioc/iocSrcMakefile.in ${PROJECT_BINARY_DIR}/iocSrcMakefile)
+configure_file(ioc/CONFIG_SITE.in ${PROJECT_BINARY_DIR}/iocCONFIG_SITE)
 
 # build EPICS
 add_custom_target(${PROJECT_NAME}-epics ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildEpics ${CMAKE_CURRENT_SOURCE_DIR}/epics-base
@@ -47,7 +48,7 @@ include_directories(${PROJECT_BINARY_DIR}/epics-base/include/os/Linux)
 include_directories(${PROJECT_BINARY_DIR}/epics-base/include/compiler/gcc)
 
 file(GLOB StaticLibs "${PROJECT_BINARY_DIR}/libs/*.a")
-target_link_libraries(${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES} ${StaticLibs})
+target_link_libraries(${PROJECT_NAME} "${ChimeraTK-ControlSystemAdapter_LIBRARIES};${StaticLibs};readline")
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS} -Wl,--no-as-needed")

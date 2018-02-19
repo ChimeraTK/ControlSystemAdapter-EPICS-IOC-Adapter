@@ -35,8 +35,11 @@ ChimeraTK_SRCS_vxWorks += -nil-
 ChimeraTK_LIBS += $(EPICS_BASE_IOC_LIBS)
 
 # Import device support for ChimeraTK-ControlSystemAdapter-EPICS
-ChimeraTKApp_DBD += ChimeraTK-ControlSystemAdapter-EPICS.dbd
-ChimeraTKApp_LIBS += ChimeraTK-ControlSystemAdapter-EPICS
+ChimeraTK_DBD += ChimeraTK-ControlSystemAdapter-EPICS.dbd
+ChimeraTK_LIBS += ChimeraTK-ControlSystemAdapter-EPICS
+
+# Add required dependency library of the ChimeraTK-ControlSystemAdapter-EPICS
+ChimeraTK_SYS_LIBS += ChimeraTK-ControlSystemAdapter
 
 #===========================
 
