@@ -1,4 +1,4 @@
-PROJECT(ChimeraTK-ControlSystemAdapter-EPICSIOCAdapter)
+PROJECT(ChimeraTK-ControlSystemAdapter-EPICS-IOC-Adapter)
 cmake_minimum_required(VERSION 2.8)
 
 include(cmake/add_dependency.cmake)
