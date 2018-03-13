@@ -7,10 +7,13 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${C
 
 set(${PROJECT_NAME}_MAJOR_VERSION 00)
 set(${PROJECT_NAME}_MINOR_VERSION 01)
-set(${PROJECT_NAME}_PATCH_VERSION 00)
+set(${PROJECT_NAME}_PATCH_VERSION 01)
 include(cmake/set_version_numbers.cmake)
 
 add_dependency(ChimeraTK-ControlSystemAdapter REQUIRED)
+
+find_package(readline REQUIRED)
+
 
 # configure files required to build the ControlSystemAdapter-EPICS
 list(GET ChimeraTK-ControlSystemAdapter_INCLUDE_DIRS 0 ChimeraTK-ControlSystemAdapter_INCLUDE_DIR)
@@ -48,7 +51,7 @@ include_directories(${PROJECT_BINARY_DIR}/epics-base/include/os/Linux)
 include_directories(${PROJECT_BINARY_DIR}/epics-base/include/compiler/gcc)
 
 file(GLOB StaticLibs "${PROJECT_BINARY_DIR}/libs/*.a")
-target_link_libraries(${PROJECT_NAME} "${ChimeraTK-ControlSystemAdapter_LIBRARIES};${StaticLibs};readline")
+target_link_libraries(${PROJECT_NAME} "${ChimeraTK-ControlSystemAdapter_LIBRARIES};${StaticLibs};${readline_LIBRARY}")
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS} -Wl,--no-as-needed")
@@ -66,6 +69,6 @@ set(${PROJECT_NAME}_INCLUDE_DIRS "")
 set(${PROJECT_NAME}_LIBRARIES "${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES}")
 set(${PROJECT_NAME}_LIBRARY_DIRS "${CMAKE_INSTALL_PREFIX}/lib")
 set(${PROJECT_NAME}_CXX_FLAGS "")
-set(${PROJECT_NAME}_LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS}")
+set(${PROJECT_NAME}_LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS} -Wl,--no-as-needed")
 include(${CMAKE_SOURCE_DIR}/cmake/create_cmake_config_files.cmake)
 
