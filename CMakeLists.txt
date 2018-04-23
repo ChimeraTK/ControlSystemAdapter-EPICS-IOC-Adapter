@@ -31,7 +31,7 @@ add_custom_target(${PROJECT_NAME}-epics ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/
                                             WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
 
 # build the ControlSystemAdapter-EPICS
-add_custom_target(${PROJECT_NAME}-adapter ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAdapter ${CMAKE_CURRENT_SOURCE_DIR}/ChimeraTK-ControlSystemAdapter-EPICS
+add_custom_target(${PROJECT_NAME}-adapter ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAdapter ${CMAKE_CURRENT_SOURCE_DIR}/ChimeraTK-ControlSystemAdapter-EPICS ${ChimeraTK-ControlSystemAdapter_PREFIX}
                                               WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
                                               DEPENDS ${PROJECT_NAME}-epics)
 

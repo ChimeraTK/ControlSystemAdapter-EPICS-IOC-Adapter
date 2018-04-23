@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 ADAPTER_SOURCE="$1"
+CSA_PREFIX="$2"
 PROJECT_BINARY_DIR="`pwd`"
 EPICS_BASE=${PROJECT_BINARY_DIR}/epics-base
 
@@ -13,6 +14,8 @@ makeLink() {
 export -f makeLink
 export PROJECT_BINARY_DIR
 export ADAPTER_SOURCE
+
+export PATH=${CSA_PREFIX}/bin:${PATH}
 
 if [ ! -f "${PROJECT_BINARY_DIR}/AdapterSourceLinked" ]; then
   cd "${ADAPTER_SOURCE}/"
