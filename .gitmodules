@@ -4,3 +4,6 @@
 [submodule "ChimeraTK-ControlSystemAdapter-EPICS"]
 	path = ChimeraTK-ControlSystemAdapter-EPICS
 	url = https://github.com/aquenos/ChimeraTK-ControlSystemAdapter-EPICS
+[submodule "plugins/autosave"]
+	path = plugins/autosave
+	url = https://github.com/epics-modules/autosave.git
