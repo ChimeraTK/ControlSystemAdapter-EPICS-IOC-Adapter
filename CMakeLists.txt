@@ -30,6 +30,11 @@ configure_file(ioc/CONFIG_SITE.in ${PROJECT_BINARY_DIR}/iocCONFIG_SITE)
 add_custom_target(${PROJECT_NAME}-epics ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildEpics ${CMAKE_CURRENT_SOURCE_DIR}/epics-base
                                             WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
 
+# build autosave
+add_custom_target(${PROJECT_NAME}-autosave ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAutosave ${CMAKE_CURRENT_SOURCE_DIR}/plugins/autosave
+                                                WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+                                                DEPENDS ${PROJECT_NAME}-epics)
+
 # build the ControlSystemAdapter-EPICS
 add_custom_target(${PROJECT_NAME}-adapter ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAdapter ${CMAKE_CURRENT_SOURCE_DIR}/ChimeraTK-ControlSystemAdapter-EPICS ${ChimeraTK-ControlSystemAdapter_PREFIX}
                                               WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
@@ -58,6 +63,7 @@ target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libdbCore.a)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libdbRecStd.a)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libgdd.a)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libChimeraTK-ControlSystemAdapter-EPICS.a)
+target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libautosave.a)
 target_link_libraries(${PROJECT_NAME} ${readline_LIBRARY})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
