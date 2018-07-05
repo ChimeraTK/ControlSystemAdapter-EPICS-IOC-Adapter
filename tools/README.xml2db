@@ -1,0 +1,55 @@
+xml2db: Tool to generate EPICS .db file(s) from ChimeraTK process variables, extracted into xml file with the tool 'llrfserver-xmlGenerator'.
+Dependancies: Python 3.5
+Tested on Debian Linux 4.13.0-45-generic
+
+usage: xml2db [-h] [-x EXTRACT] [-r [MACRO] | -o [MACRO]]
+              [-m length_of_macros] [-v] [-ver] [-ns NAMESPACE]
+              path_xml path_db
+
+Writes EPICS record for every 'variable' defined in ChimeraTK-xml file to
+EPICS database file. Optionally a subset of PVs, described by a regular
+expression, can be extracted and autosave request files can be created
+additionally or exclusively.
+
+positional arguments:
+  path_xml              Path of ChimeraTK xml file
+  path_db               Path of EPICS db file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -x EXTRACT, --extract EXTRACT
+                        Generates .db file, which only contains records for
+                        PVs matching the regular expression EXTRACT
+  -r [MACRO], --asRequest [MACRO]
+                        Generate additionally an autosave request file as
+                        <path_db>.req with MACRO being the entirety of macros
+                        used, when loading the records.
+  -o [MACRO], --asRequestOnly [MACRO]
+                        Generate just an autosave request file as
+                        <path_db>.req with MACRO being the entirety of macros
+                        used, when loading the records.
+  -m length_of_macros, --macro length_of_macros
+                        Maximum combined length of macros used, when loading
+                        the records. Is subtracted from max length of PVs.
+                        Defaults to 5.
+  -v, --verbose         Activates verbosity
+  -ver, --version       Prints version and exits
+  -ns NAMESPACE, --namespace NAMESPACE
+                        Define a different xml namespace. Default:
+                        https://github.com/ChimeraTK/ApplicationCore
+
+About regular expressions for EXTRACT:
+
+-   Keep in mind, that it compares the PV string with the regex, before MACRO is added.
+    Thus, exclude the content of MACRO from the regular expression.
+-   Construct the regular expression to match the whole PV: EXTRACT = '^<pattern>$'
+
+    Examples:
+    Extract all PVs from 'Automation' branch:
+        '^(Automation/)\w+/*\w+$'
+    Extract all PVs, which have 'Calibration' anywhere in their PV, but in the "root":
+        '^(\w+/)+\w*(Calibration)(\w*/)*\w+$'
+    Extract all PVs, but those who have a "directory" "DAQ" or a "variable" containing "raw" in their PV:
+        '^(?!(\w+/)+DAQ/|\w+/)+\w*raw\w*)(\w+/)*\w+$'
+    Extract all PVs, which "variable" contains "enable":
+        '^(\w+/)+\w*(enable)\w*$'
