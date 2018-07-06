@@ -96,7 +96,7 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict):
     else:
         dbEntry['EGU'] = engineerunit
     
-    dbEntry['SCAN'] = '1 second' # FIXME: Is generic. 
+    dbEntry['SCAN'] = '.1 second' # FIXME: Is generic. 
     dbEntry['FTVL'] = typeConversion[xmlHandle.find(nsPrefix + ':value_type', nsDict).text]
     dbEntry['dirLink'] = '@$(APP) ' + dbEntry['PV']
     dbEntry['numElements'] = int(xmlHandle.find(nsPrefix + ':numberOfElements', nsDict).text)
@@ -153,7 +153,7 @@ def writeReq(reqfile, records, maxLengthPV, macro):
             PVname = macro + shortenPV(e['PV'], maxLengthPV)
             if e['FTVL'] in ['STRING', 'CHAR']:
                 fh.write('#' + PVname + '\n')
-            else:
+            elif e['dir'] == 'OUT':
                 fh.write(PVname + '\n')
 
 def shortenPV(inPV, maxLength, sep='/'):
@@ -218,14 +218,14 @@ CLAP=argparse.ArgumentParser(description='Writes EPICS record for every \'variab
 # Set up command line arguments
 CLAP.add_argument('path_xml', help='Path of ChimeraTK xml file')
 CLAP.add_argument('path_db', help='Path of EPICS db file')
-CLAP.add_argument('-x', '--extract', help='Generates .db file, which only contains records for PVs matching the regular expression EXTRACT')
+CLAP.add_argument('-x', '--extract', help='Generates .db file, which only contains records for PVs matching the regular expression RegEx', metavar='RegEx')
 REQ = CLAP.add_mutually_exclusive_group()
-REQ.add_argument('-r', '--asRequest', help='Generate additionally an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', metavar='MACRO', nargs='?', const='')
-REQ.add_argument('-o', '--asRequestOnly', help='Generate just an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', metavar='MACRO', nargs='?', const='')
+REQ.add_argument('-r', '--asRequest', help='Generate additionally an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', metavar='macro', nargs='?', const='')
+REQ.add_argument('-o', '--asRequestOnly', help='Generate just an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', metavar='macro', nargs='?', const='')
 CLAP.add_argument('-m', '--macro', help='Maximum combined length of macros used, when loading the records. Is subtracted from max length of PVs. Defaults to 5.', type=int, default=5, metavar='length_of_macros')
 CLAP.add_argument('-v', '--verbose', help='Activates verbosity', action='store_true')
 CLAP.add_argument('-ver', '--version', help='Prints version and exits', action='version', version=VERSION)
-CLAP.add_argument('-ns', '--namespace', help='Define a different xml namespace. Default: https://github.com/ChimeraTK/ApplicationCore')
+CLAP.add_argument('-ns', '--namespace', help='Define a different xml namespace. Default: https://github.com/ChimeraTK/ApplicationCore', metavar='xml_NameSpace')
 # Parse Command Line Arguments
 CLA=CLAP.parse_args()
 
