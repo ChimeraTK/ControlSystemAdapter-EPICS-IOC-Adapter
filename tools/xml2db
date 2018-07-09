@@ -169,7 +169,7 @@ def shortenPV(inPV, maxLength, sep='/'):
     if len(inPV) <= maxLength:
         return inPV
     # Defining dictionary with abbreviations
-    abbr = dict([('amplitude', 'amp'), ('Amplitude', 'Amp'), ('phase', 'ph'), ('Phase', 'Ph'), ('calibration', 'cal'), ('Calibration', 'Cal'), ('after', 'aft'), ('After', 'Aft'), ('average', 'avg'), ('Average', 'Avg'), ('request', 'req'), ('Request', 'Req'), ('deviation', 'dev'), ('Deviation', 'Dev'), ('standard', 'std'), ('Standard', 'Std'), ('register', 'reg'), ('Register', 'Reg'), ('registers', 'regs'), ('Registers', 'Regs'), ('maximum', 'max'), ('Maximum', 'Max'), ('minimum', 'min'), ('Minimum', 'Min')])
+    abbr = dict([('amplitude', 'amp'), ('Amplitude', 'Amp'), ('phase', 'ph'), ('Phase', 'Ph'), ('calibration', 'cal'), ('Calibration', 'Cal'), ('after', 'aft'), ('After', 'Aft'), ('average', 'avg'), ('Average', 'Avg'), ('request', 'req'), ('Request', 'Req'), ('deviation', 'dev'), ('Deviation', 'Dev'), ('standard', 'std'), ('Standard', 'Std'), ('register', 'reg'), ('Register', 'Reg'), ('registers', 'regs'), ('Registers', 'Regs'), ('maximum', 'max'), ('Maximum', 'Max'), ('minimum', 'min'), ('Minimum', 'Min'), ('Output', 'Out'), ('Correction', 'Corr'), ('Configuration', 'Config')])
     # Calculating overlength and seperating into parts defined by separators
     over = len(inPV)-maxLength
     if CLA.verbose:
