@@ -2,8 +2,8 @@ xml2db: Tool to generate EPICS .db file(s) from ChimeraTK process variables, ext
 Dependancies: Python 3.5
 Tested on Debian Linux 4.13.0-45-generic
 
-usage: xml2db [-h] [-x EXTRACT] [-r [MACRO] | -o [MACRO]]
-              [-m length_of_macros] [-v] [-ver] [-ns NAMESPACE]
+usage: xml2db [-h] [-x RegEx] [-r [macro] | -o [macro]] [-m length_of_macros]
+              [-v] [-ver] [-s] [-D path] [-ns xml_NameSpace]
               path_xml path_db
 
 Writes EPICS record for every 'variable' defined in ChimeraTK-xml file to
@@ -17,14 +17,14 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -x EXTRACT, --extract EXTRACT
+  -x RegEx, --extract RegEx
                         Generates .db file, which only contains records for
-                        PVs matching the regular expression EXTRACT
-  -r [MACRO], --asRequest [MACRO]
+                        PVs matching the regular expression RegEx
+  -r [macro], --asRequest [macro]
                         Generate additionally an autosave request file as
                         <path_db>.req with MACRO being the entirety of macros
                         used, when loading the records.
-  -o [MACRO], --asRequestOnly [MACRO]
+  -o [macro], --asRequestOnly [macro]
                         Generate just an autosave request file as
                         <path_db>.req with MACRO being the entirety of macros
                         used, when loading the records.
@@ -34,7 +34,14 @@ optional arguments:
                         Defaults to 5.
   -v, --verbose         Activates verbosity
   -ver, --version       Prints version and exits
-  -ns NAMESPACE, --namespace NAMESPACE
+  -s, --shorter         -s shortens just the last part of th PV. -ss shortens
+                        also parts of the PV before the last separator. -sss
+                        shortens every part of every PV indiscriminately
+  -D path, --pathToDict path
+                        Path to the file "dictionary.py". Only necessary, if
+                        it is not in this directory, nor a directory defined
+                        in the environment variable "PYTHONPATH".
+  -ns xml_NameSpace, --namespace xml_NameSpace
                         Define a different xml namespace. Default:
                         https://github.com/ChimeraTK/ApplicationCore
 
@@ -53,3 +60,16 @@ About regular expressions for EXTRACT:
         '^(?!(\w+/)+DAQ/|\w+/)+\w*raw\w*)(\w+/)*\w+$'
     Extract all PVs, which "variable" contains "enable":
         '^(\w+/)+\w*(enable)\w*$'
+
+About dictionaries:
+
+The dictionary for abbreviations has to be a dictionary-type array, which is returned by a function "abbreviation()" from a file named "dictionary.py". If this file is not within the same directory as the xml2db file, or in any directory defined in the environment variable PYTHONPATH, the option -D can be used to allow xml2db to find the file "dictionary.py".
+
+About PV name shortening:
+
+The flag -s is accumulative. It can be used up to three times, to use different escalation levels of shortening:
+
+ None:  The PV names aren't shortened at all. Every overlong PV name generates an error massage and the files are not written.
+ -s:    Only the part of the PV name after the last slash is shortened. If this is not enough, the tool will abort.
+ -ss:   If the PV name is too long, all parts of the PV names (save the slashes) are tried to be shortened.
+ -sss:  Every PV name is shortened.
