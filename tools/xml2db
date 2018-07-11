@@ -309,7 +309,7 @@ if CLA.pathToDict != None:
         sys.path.append(os.path.realpath(CLA.pathToDict))
 
 # Process shorter argument
-if CLA.shorter > 3:
+if CLA.shorter != None and  CLA.shorter > 3:
     sys.exit('Error: Too much -s! Maximum three are allowed')
 
 # Parse xml file.
