@@ -140,12 +140,12 @@ def writeDB(dbfile, records, maxLengthPV, ind='  '):
                 if e['FTVL'] in ['STRING', 'CHAR']:
                     indTemp = ind
                     ind = '#'
-                    fh.write('#record(' + e['recordType'] + ', \"$(P)$(R)' + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n#}\n\n')
+                    fh.write('#record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n#}\n\n')
                     ind = indTemp
                 else:
-                    fh.write('record(' + e['recordType'] + ', \"$(P)$(R)' + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n' + ind + 'field(EGU, \"' + e['EGU'] + '\")\n}\n\n')
+                    fh.write('record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n' + ind + 'field(EGU, \"' + e['EGU'] + '\")\n}\n\n')
             elif e['numElements'] > 1:
-                fh.write('record(' + e['recordType'] + ', \"$(P)$(R)' + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n' + ind + 'field(EGU, \"' + e['EGU'] + '\")\n' + ind + 'field(FTVL, \"' + e['FTVL'] + '\")\n' + ind + 'field(NELM, \"' + e['NELM'] + '\")\n}\n\n')
+                fh.write('record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n' + ind + 'field(EGU, \"' + e['EGU'] + '\")\n' + ind + 'field(FTVL, \"' + e['FTVL'] + '\")\n' + ind + 'field(NELM, \"' + e['NELM'] + '\")\n}\n\n')
 
 def writeReq(reqfile, records, maxLengthPV, macro):
     # Open file
@@ -260,9 +260,10 @@ CLAP.add_argument('path_xml', help='Path of ChimeraTK xml file')
 CLAP.add_argument('path_db', help='Path of EPICS db file')
 CLAP.add_argument('-x', '--extract', help='Generates .db file, which only contains records for PVs matching the regular expression RegEx', metavar='RegEx')
 REQ = CLAP.add_mutually_exclusive_group()
-REQ.add_argument('-r', '--asRequest', help='Generate additionally an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', metavar='macro', nargs='?', const='')
-REQ.add_argument('-o', '--asRequestOnly', help='Generate just an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', metavar='macro', nargs='?', const='')
+REQ.add_argument('-r', '--asRequest', help='Generate additionally an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', action='store_true')
+REQ.add_argument('-o', '--asRequestOnly', help='Generate just an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', action='store_true')
 CLAP.add_argument('-m', '--macro', help='Maximum combined length of macros used, when loading the records. Is subtracted from max length of PVs. Defaults to 5.', type=int, default=5, metavar='length_of_macros')
+CLAP.add_argument('-M', '--Macro', help='Macros used, when loading the records, i.e. $(P). Will be added at the beginning of the PV name. Also used for .req files. Defaults to empty string', default='', metavar='macro_string')
 CLAP.add_argument('-v', '--verbose', help='Activates verbosity', action='store_true')
 CLAP.add_argument('-ver', '--version', help='Prints version and exits', action='version', version=VERSION)
 CLAP.add_argument('-s', '--shorter', help='-s shortens just the last part of th PV. -ss shortens also parts of the PV before the last separator. -sss shortens every part of every PV indiscriminately', action='count')
@@ -292,16 +293,12 @@ else:
     reqfile = os.path.join(dbfilePath, reqfileName)
     dbfile = os.path.join(dbfilePath, dbfileName)
 
-# Process asRequest and asRequestOnly argument
-if CLA.asRequest != None:
-    asMacro = CLA.asRequest
-elif CLA.asRequestOnly != None:
-    asMacro = CLA.asRequestOnly
-else:
-    asMacro = None
-
 # Process macro argument
 maxPVLen = 60 - CLA.macro
+
+# Process Macro argument
+if CLA.Macro != None:
+    MacroString = CLA.Macro
 
 # Process pathToDict argument
 if CLA.pathToDict != None:
@@ -340,7 +337,7 @@ if CLA.extract != None:
     if CLA.verbose:
         print('Write File: ' + resdbfile)
     # Write _res.db file
-    if CLA.asRequestOnly != None and WriteFlag:
+    if not CLA.asRequestOnly and WriteFlag:
         writeDB(resdbfile, variablesRes, maxPVLen)
     elif not WriteFlag:
         sys.stderr.write('Error: ' + str(resdbfile) + ' was not written, due to overlong PVs\n')
@@ -359,13 +356,13 @@ if not WriteFlag:
     sys.exit('Error: Too long PV(s), ' + str(dbfile) + ' was not written!\n')
     
 # Write autosave request file
-if asMacro != None:
+if CLA.asRequest or CLA.asRequestOnly:
     if CLA.verbose:
         print('Write File ' + reqfile)
-    writeReq(reqfile, variables, maxPVLen, asMacro)
-if CLA.verbose:
-    print('Write File: ' + dbfile)
+    writeReq(reqfile, variables, maxPVLen, MacroString)
 
 # Write .db file
-if not CLA.asRequestOnly != None:
+if CLA.verbose:
+    print('Write File: ' + dbfile)
+if not CLA.asRequestOnly:
     writeDB(dbfile, variables, maxPVLen)
