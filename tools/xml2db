@@ -184,7 +184,7 @@ def shortenPV(inPV, maxLength, sep='/', justCheck=False):
     # Loading dictionary with abbreviations from file dictionary.py.
     from dictionary import abbreviation
     abbr = abbreviation()
-    #dict([('amplitude', 'amp'), ('Amplitude', 'Amp'), ('phase', 'phi'), ('Phase', 'Phi'), ('calibration', 'cal'), ('Calibration', 'Cal'), ('after', 'aft'), ('After', 'Aft'), ('average', 'avg'), ('Average', 'Avg'), ('request', 'req'), ('Request', 'Req'), ('deviation', 'dev'), ('Deviation', 'Dev'), ('standard', 'std'), ('Standard', 'Std'), ('register', 'reg'), ('Register', 'Reg'), ('registers', 'regs'), ('Registers', 'Regs'), ('maximum', 'max'), ('Maximum', 'Max'), ('minimum', 'min'), ('Minimum', 'Min'), ('Output', 'Out'), ('Correction', 'Corr'), ('correction', 'corr'), ('Configuration', 'Cfg'), ('configuration', 'cfg'), ('Low', 'Lo'), ('low', 'lo'), ('High', 'Hi'), ('high', 'hi'), ('Triggers', 'Trg'), ('triggers', 'trg'), ('Trigger', 'Trg'), ('trigger', 'trg'), ('Iand', 'I'), ('Forward', 'Fwd'), ('forward', 'fwd')])
+
     # Calculating overlength and seperating into parts defined by separators
     if CLA.verbose:
         print(inPV + ' is ' + str(over) + ' Characters too long:')
@@ -197,6 +197,7 @@ def shortenPV(inPV, maxLength, sep='/', justCheck=False):
         names = [ Name ]
         pathpv = p1 + p2
         newNames = ''
+
     # Searching for replaceable words
     for name in names:
         if over <= 0 and CLA.shorter != 3: # If PV is short enough (and -sss is not set) bypass shortening
@@ -223,6 +224,7 @@ def shortenPV(inPV, maxLength, sep='/', justCheck=False):
                 newNames.append(newWords)
             elif CLA.shorter == 1:
                 newNames += newWords
+
     # In case a reasonable abbreviation was not enough, just cut the sucker down
     if over > 0:
         if CLA.shorter >= 2:
@@ -236,6 +238,7 @@ def shortenPV(inPV, maxLength, sep='/', justCheck=False):
             newNames[0] = cutName
         elif CLA.shorter == 1:
             newNames = cutName
+
     # Construction of new PV
     newPV = ''
     if CLA.shorter >= 2:
@@ -315,10 +318,12 @@ if CLA.shorter != None and  CLA.shorter > 3:
 # Parse xml file.
 tree = ET.parse(CLA.path_xml)
 root = tree.getroot()
+
 # Generate Index
 if CLA.verbose:
     print('Generating Index')
 index = makeIndex(root, 'AppCore', ns)
+
 # Extract index subset, if needed
 WriteFlag = True
 if CLA.extract != None:
@@ -360,6 +365,7 @@ if asMacro != None:
     writeReq(reqfile, variables, maxPVLen, asMacro)
 if CLA.verbose:
     print('Write File: ' + dbfile)
+
 # Write .db file
 if not CLA.asRequestOnly != None:
     writeDB(dbfile, variables, maxPVLen)
