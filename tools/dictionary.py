@@ -9,9 +9,7 @@ Syntax:
 def abbreviation():
     abbr = dict([
         ('amplitude', 'amp'), ('Amplitude', 'Amp'), 
-        ('phase', 'phi'), ('Phase', 'Phi'), 
         ('calibration', 'cal'), ('Calibration', 'Cal'), 
-        ('after', 'aft'), ('After', 'Aft'), 
         ('average', 'avg'), ('Average', 'Avg'), 
         ('request', 'req'), ('Request', 'Req'), 
         ('deviation', 'dev'), ('Deviation', 'Dev'), 
@@ -22,12 +20,11 @@ def abbreviation():
         ('minimum', 'min'), ('Minimum', 'Min'), 
         ('Output', 'Out'), 
         ('correction', 'corr'), ('Correction', 'Corr'), 
-        ('configuration', 'cfg'), ('Configuration', 'Cfg'), 
+        ('configuration', 'config'), ('Configuration', 'Config'), 
         ('low', 'lo'), ('Low', 'Lo'), 
         ('high', 'hi'), ('High', 'Hi'), 
-        ('triggers', 'trg'), ('Triggers', 'Trg'), 
+        ('triggers', 'trgs'), ('Triggers', 'Trgs'), 
         ('trigger', 'trg'), ('Trigger', 'Trg'), 
         ('Iand', 'I'), 
-        ('forward', 'fwd'), ('Forward', 'Fwd')
         ])
     return abbr

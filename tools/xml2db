@@ -286,7 +286,7 @@ elif dbfileName == '':
 else:
     indDot = dbfileName.rfind('.')
     if indDot in [-1, 0]:
-        reqfileName = dbfilename + '.req'
+        reqfileName = dbfileName + '.req'
     else:
         reqfileName = dbfileName[:indDot] + '.req'
     reqfile = os.path.join(dbfilePath, reqfileName)
