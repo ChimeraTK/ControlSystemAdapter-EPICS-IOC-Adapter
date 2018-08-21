@@ -8,10 +8,12 @@ import sys
 import os # For file manipulation
 import argparse # Parse command line arguments
 
-VERSION = '1.0'
+VERSION = '1.1'
 
 # changelog:
 # 1.0: First working version
+# 1.1: Added replacement of periods in PV names
+# 1.1: Added exception handling for unexpected entries in xml file
 
 def makeIndex(xmlNode, nsPrefix, nsDict, pvPath = ''):
     '''
@@ -51,7 +53,7 @@ def extractIndex(index, regex):
             indexOut[pv] = index[pv]
     return indexOut, indexResidue
 
-def readVar(index, nsPrefix, nsDict):
+def readVar(index, nsPrefix, nsDict, repDot):
     '''
     Generates list of dictionaries, holding information to generate .db records.
     Takes:
@@ -63,10 +65,12 @@ def readVar(index, nsPrefix, nsDict):
     '''
     listVar = []
     for pv in sorted(index.keys()):
-        listVar.append(genDbEntry(pv, index[pv], nsPrefix, nsDict))
+        tempDBEntry = genDbEntry(pv, index[pv], nsPrefix, nsDict, repDot)
+        if tempDBEntry != None: # Check for invalid entries
+            listVar.append(tempDBEntry)
     return listVar
 
-def genDbEntry(pv, xmlHandle, nsPrefix, nsDict):
+def genDbEntry(pv, xmlHandle, nsPrefix, nsDict, repDot):
     '''
     Function to extract data from a 'variable' entry in a ChimeraTK xml file and returns it as dictionary.
     Takes:
@@ -74,6 +78,7 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict):
         xmlHandle: Handle of the 'variable' entry
         nsPrefix: Namespace prefix (without ':')
         nsDict: Namespace dictionary, containing nsPrefix
+        repDot: Replacement for periods
     Returns:
         dbEntry: A dictionary, containing all the information needed to buils epics db entrys
     '''
@@ -81,27 +86,55 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict):
     # Dictionary to convert standard data types into EPICS equivalents.
     typeConversion = dict([('int32', 'LONG'), ('uint32', 'ULONG'), ('int16', 'SHORT'), ('uint16', 'USHORT'), ('int8', 'CHAR'), ('uint8', 'UCHAR'), ('double', 'DOUBLE'), ('float', 'FLOAT'), ('string', 'STRING')])
     # Generating entries for db record with exeption handling, if necessary (i.e. description).
-    dbEntry['PV'] = pv
+    dbEntry['PV'] = re.sub('\.',repDot,pv) # Replaces all periods (.) with underscores (_), to avoid invalid PV names.
     dbEntry['DTYP'] = 'ChimeraTK' # FIXME: Is generic, might be extracted from .dbd?
     
-    description = xmlHandle.find(nsPrefix + ':description', nsDict).text
+    try:
+        description = xmlHandle.find(nsPrefix + ':description', nsDict).text
+    except AttributeError:
+        sys.stderr.write('Variable \"' + pv + '\" seems to have no <description> field.\n\tRecord <' + dbEntry['PV'] + '> will have empty DESC field.\n\n')
+        description = None
+    
     if description == None:
         dbEntry['DESC'] = ''
     else:
         dbEntry['DESC'] = description[0:28]
     
-    engineerunit = xmlHandle.find(nsPrefix + ':unit', nsDict).text
+    try:
+        engineerunit = xmlHandle.find(nsPrefix + ':unit', nsDict).text
+    except AttributeError:
+        sys.stderr.write('Variable \"' + pv + '\" seems to have no <unit> field.\n\tRecord <' + dbEntry['PV'] + '> will have empty EGU field.\n\n')
+        engineerunit = None
+    
     if engineerunit == None:
         dbEntry['EGU'] = ''
     else:
         dbEntry['EGU'] = engineerunit
     
     dbEntry['SCAN'] = '.1 second' # FIXME: Is generic. 
-    dbEntry['FTVL'] = typeConversion[xmlHandle.find(nsPrefix + ':value_type', nsDict).text]
-    dbEntry['dirLink'] = '@$(APP) ' + dbEntry['PV']
-    dbEntry['numElements'] = int(xmlHandle.find(nsPrefix + ':numberOfElements', nsDict).text)
+    try:
+        dbEntry['FTVL'] = typeConversion[xmlHandle.find(nsPrefix + ':value_type', nsDict).text]
+    except KeyError:
+        sys.stderr.write('\"' + xmlHandle.find(nsPrefix + ':value_type', nsDict).text + '\" is not a recognized variable type.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+        return None
+    except AttributeError:
+        sys.stderr.write('Variable \"' + pv + '\" seems to have no <value_type> field.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+        return None
+
+    dbEntry['dirLink'] = '@$(APP) ' + pv
+    try:
+        dbEntry['numElements'] = int(xmlHandle.find(nsPrefix + ':numberOfElements', nsDict).text)
+    except AttributeError:
+        sys.stderr.write('Variable \"' + pv + '\" seems to have no <numberOfElements> field.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+        return None
     
-    if  xmlHandle.find(nsPrefix + ':direction', nsDict).text == 'application_to_control_system':
+    try:
+        Direction = xmlHandle.find(nsPrefix + ':direction', nsDict).text
+    except AttributeError:
+        sys.stderr.write('Variable \"' + pv + '\" seems to have no <direction> field.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+        return None
+    
+    if  Direction == 'application_to_control_system':
         dbEntry['dir'] = 'INP'
         if dbEntry['numElements'] == 1:
             if dbEntry['FTVL'] in ['LONG', 'ULONG', 'SHORT', 'USHORT', 'CHAR', 'UCHAR']:
@@ -110,10 +143,17 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict):
                 dbEntry['recordType'] = 'ai'
             elif dbEntry['FTVL'] in ['STRING']:
                 dbEntry['recordType'] = 'stringin'
+            else:
+                sys.stderr.write('\"' + dbEntry['recordType'] + '\" is not recognized.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+                return None
         elif dbEntry['numElements'] > 1:
-            dbEntry['recordType'] = 'aai'
-            dbEntry['NELM'] = str(dbEntry['numElements'])
-    elif xmlHandle.find(nsPrefix + ':direction', nsDict).text == 'control_system_to_application':
+            if dbEntry['FTVL'] in ['LONG', 'ULONG', 'SHORT', 'USHORT', 'CHAR', 'UCHAR', 'DOUBLE', 'FLOAT', 'STRING']:
+                dbEntry['recordType'] = 'aai'
+                dbEntry['NELM'] = str(dbEntry['numElements'])
+            else:
+                sys.stderr.write('\"' + dbEntry['recordType'] + '\" is not recognized.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+                return None
+    elif Direction == 'control_system_to_application':
         dbEntry['dir'] = 'OUT'
         if dbEntry['numElements'] == 1:
             if dbEntry['FTVL'] in ['LONG', 'ULONG', 'SHORT', 'USHORT', 'CHAR', 'UCHAR']:
@@ -122,9 +162,19 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict):
                 dbEntry['recordType'] = 'ao'
             elif dbEntry['FTVL'] in ['STRING']:
                 dbEntry['recordType'] = 'stringout'
+            else:
+                sys.stderr.write('\"' + dbEntry['recordType'] + '\" is not recognized.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+                return None
         elif dbEntry['numElements'] > 1:
-            dbEntry['recordType'] = 'aao'
-            dbEntry['NELM'] = str(dbEntry['numElements'])    
+            if dbEntry['FTVL'] in ['LONG', 'ULONG', 'SHORT', 'USHORT', 'CHAR', 'UCHAR', 'DOUBLE', 'FLOAT', 'STRING']:
+                dbEntry['recordType'] = 'aao'
+                dbEntry['NELM'] = str(dbEntry['numElements'])
+            else:
+                sys.stderr.write('\"' + dbEntry['recordType'] + '\" is not recognized.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+                return None
+    else:
+        sys.stderr.write('\"' + Direction + '\" is not a recognized entry for <direction>.\n\tRecord <' + dbEntry['PV'] + '> will be omitted.\n\n')
+        return None
     
     return dbEntry
 
@@ -169,7 +219,7 @@ def shortenPV(inPV, maxLength, sep='/', justCheck=False):
     global WriteFlag
     over = len(inPV)-maxLength
     if CLA.shorter == None and over > 0:
-        sys.stderr.write('Error: ' + inPV + ' is ' + str(over) + ' Characters too long!\n')
+        sys.stderr.write('Error: ' + inPV + ' is ' + str(over) + ' Characters too long!\n\n')
         WriteFlag = False
         return
     elif justCheck:
@@ -232,7 +282,7 @@ def shortenPV(inPV, maxLength, sep='/', justCheck=False):
         elif CLA.shorter == 1:
             cutName = newNames[:-over]
         if cutName == None:
-            sys.stderr.write('Error: PV ' + inPV + ' too long and couldn\'t be shortened.\n')
+            sys.stderr.write('Error: PV ' + inPV + ' too long and couldn\'t be shortened.\n\n')
             WriteFlag = False
         if CLA.shorter >= 2:
             newNames[0] = cutName
@@ -269,6 +319,7 @@ CLAP.add_argument('-ver', '--version', help='Prints version and exits', action='
 CLAP.add_argument('-s', '--shorter', help='-s shortens just the last part of th PV. -ss shortens also parts of the PV before the last separator. -sss shortens every part of every PV indiscriminately', action='count')
 CLAP.add_argument('-D', '--pathToDict', help='Path to the file "dictionary.py". Only necessary, if it is not in this directory, nor a directory defined in the environment variable "PYTHONPATH".', metavar='path')
 CLAP.add_argument('-ns', '--namespace', help='Define a different xml namespace. Default: https://github.com/ChimeraTK/ApplicationCore', metavar='xml_NameSpace')
+CLAP.add_argument('-R', '--replacePeriod', help='Character(s) with which to replace period <.> in PV names. Has to be valid for PV names.', default='-', metavar='char')
 # Parse Command Line Arguments
 CLA=CLAP.parse_args()
 
@@ -303,7 +354,7 @@ if CLA.Macro != None:
 # Process pathToDict argument
 if CLA.pathToDict != None:
     if not os.path.isdir(CLA.pathToDict):
-        sys.stderr.write('Error: The directory given to -D / --pathToDict does not exist! \n -s / --shorter flag(s) will be ignored\n')
+        sys.stderr.write('Error: The directory given to -D / --pathToDict does not exist! \n\t-s / --shorter flag(s) will be ignored\n\n')
         CLA.shorter = None
     else:
         sys.path.append(os.path.realpath(CLA.pathToDict))
@@ -312,6 +363,13 @@ if CLA.pathToDict != None:
 if CLA.shorter != None and  CLA.shorter > 3:
     sys.exit('Error: Too much -s! Maximum three are allowed')
 
+# Process replacePeriod argument
+if any(elem in CLA.replacePeriod for elem in '.$()$#\"\'\\'):
+    sys.stderr.write('Error: The character \"' + CLA.replacePeriod + '\" is invalid in PV names.\n\tDefault (_) will be used, instead.\n\n')
+    repDot = '_'
+else:
+    repDot = CLA.replacePeriod
+    
 # Parse xml file.
 tree = ET.parse(CLA.path_xml)
 root = tree.getroot()
@@ -329,7 +387,7 @@ if CLA.extract != None:
     newIndex, resIndex = extractIndex(index, CLA.extract)
     resdbfile = dbfile[:-3] + '_res' + dbfile[-3:]
     # Read "variables" of given index.
-    variablesRes = readVar(resIndex, 'AppCore', ns)
+    variablesRes = readVar(resIndex, 'AppCore', ns, repDot)
     # Check for long PV names
     if CLA.shorter == None:
         for i in variablesRes:
@@ -345,7 +403,7 @@ else:
     newIndex = index
     
 # Read "variables" of given index.
-variables = readVar(newIndex, 'AppCore', ns)
+variables = readVar(newIndex, 'AppCore', ns, repDot)
 
 WriteFlag = True
 # Check for too long PVs, if necessary
