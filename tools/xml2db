@@ -8,12 +8,13 @@ import sys
 import os # For file manipulation
 import argparse # Parse command line arguments
 
-VERSION = '1.1'
+VERSION = '1.2'
 
 # changelog:
 # 1.0: First working version
 # 1.1: Added replacement of periods in PV names
 # 1.1: Added exception handling for unexpected entries in xml file
+# 1.2: Added feature: Generation of "documentation" file
 
 def makeIndex(xmlNode, nsPrefix, nsDict, pvPath = ''):
     '''
@@ -98,7 +99,7 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict, repDot):
     if description == None:
         dbEntry['DESC'] = ''
     else:
-        dbEntry['DESC'] = description[0:28]
+        dbEntry['DESC'] = str(description)
     
     try:
         engineerunit = xmlHandle.find(nsPrefix + ':unit', nsDict).text
@@ -190,12 +191,12 @@ def writeDB(dbfile, records, maxLengthPV, ind='  '):
                 if e['FTVL'] in ['STRING', 'CHAR']:
                     indTemp = ind
                     ind = '#'
-                    fh.write('#record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n#}\n\n')
+                    fh.write('#record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n#}\n\n')
                     ind = indTemp
                 else:
-                    fh.write('record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n' + ind + 'field(EGU, \"' + e['EGU'] + '\")\n}\n\n')
+                    fh.write('record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n' + ind + 'field(EGU, \"' + e['EGU'] + '\")\n}\n\n')
             elif e['numElements'] > 1:
-                fh.write('record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(DESC, \"' + e['DESC'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n' + ind + 'field(EGU, \"' + e['EGU'] + '\")\n' + ind + 'field(FTVL, \"' + e['FTVL'] + '\")\n' + ind + 'field(NELM, \"' + e['NELM'] + '\")\n}\n\n')
+                fh.write('record(' + e['recordType'] + ', \"' + MacroString + PVname + '\"){\n' + ind + 'field(DTYP, \"' + e['DTYP'] + '\")\n' + ind + 'field(' + e['dir'] + ', \"' + e['dirLink'] + '\")\n' + ind + 'field(SCAN, \"' + e['SCAN'] + '\")\n' + ind + 'field(EGU, \"' + e['EGU'] + '\")\n' + ind + 'field(FTVL, \"' + e['FTVL'] + '\")\n' + ind + 'field(NELM, \"' + e['NELM'] + '\")\n}\n\n')
 
 def writeReq(reqfile, records, maxLengthPV, macro):
     # Open file
@@ -206,6 +207,17 @@ def writeReq(reqfile, records, maxLengthPV, macro):
                 fh.write('#' + PVname + '\n')
             elif e['dir'] == 'OUT':
                 fh.write(PVname + '\n')
+
+def writeDoc(docfile, dbfile, xmlfile, records, maxLengthPV, macro):
+    # Open file
+    with open(docfile, 'w') as fh:
+        #write Head
+        fh.write('This file contains a list of all PVs, contained in\n' + dbfile + '\naccompanied by the description as delivered in\n' + xmlfile + '\n\n')
+        #write list of PV with descriptions
+        for e in records:
+            PVname = macro + shortenPV(e['PV'], maxLengthPV)
+            fh.write(PVname + ':\n\t' + e['DESC'] + '\n\n')
+
 
 def shortenPV(inPV, maxLength, sep='/', justCheck=False):
     '''
@@ -311,9 +323,12 @@ CLAP.add_argument('path_db', help='Path of EPICS db file')
 CLAP.add_argument('-x', '--extract', help='Generates .db file, which only contains records for PVs matching the regular expression RegEx', metavar='RegEx')
 REQ = CLAP.add_mutually_exclusive_group()
 REQ.add_argument('-r', '--asRequest', help='Generate additionally an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', action='store_true')
-REQ.add_argument('-o', '--asRequestOnly', help='Generate just an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', action='store_true')
+REQ.add_argument('-ro', '--asRequestOnly', help='Generate just an autosave request file as <path_db>.req with MACRO being the entirety of macros used, when loading the records.', action='store_true')
+DOC = CLAP.add_mutually_exclusive_group()
+DOC.add_argument('-d', '--Documentation', help='Generates file with PVnames + description from xml file.', action='store_true')
+DOC.add_argument('-do', '--DocumentationOnly', help='Generates only file with PVnames + description from xml file.', action='store_true')
 CLAP.add_argument('-m', '--macro', help='Maximum combined length of macros used, when loading the records. Is subtracted from max length of PVs. Defaults to 5.', type=int, default=5, metavar='length_of_macros')
-CLAP.add_argument('-M', '--Macro', help='Macros used, when loading the records, i.e. $(P). Will be added at the beginning of the PV name. Also used for .req files. Defaults to empty string', default='', metavar='macro_string')
+CLAP.add_argument('-M', '--Macro', help='Macros used, when loading the records, i.e. $(P). Will be added at the beginning of the PV name. Also used for .req and documentation files. Defaults to empty string', default='', metavar='macro_string')
 CLAP.add_argument('-v', '--verbose', help='Activates verbosity', action='store_true')
 CLAP.add_argument('-ver', '--version', help='Prints version and exits', action='version', version=VERSION)
 CLAP.add_argument('-s', '--shorter', help='-s shortens just the last part of th PV. -ss shortens also parts of the PV before the last separator. -sss shortens every part of every PV indiscriminately', action='count')
@@ -341,8 +356,15 @@ else:
         reqfileName = dbfileName + '.req'
     else:
         reqfileName = dbfileName[:indDot] + '.req'
+    
+    if indDot in [-1, 0]:
+        docfileName = dbfileName + '_doc.txt'
+    else:
+        docfileName = dbfileName[:indDot] + '_doc.txt'
+    
     reqfile = os.path.join(dbfilePath, reqfileName)
     dbfile = os.path.join(dbfilePath, dbfileName)
+    docfile = os.path.join(dbfilePath, docfileName)
 
 # Process macro argument
 maxPVLen = 60 - CLA.macro
@@ -422,5 +444,11 @@ if CLA.asRequest or CLA.asRequestOnly:
 # Write .db file
 if CLA.verbose:
     print('Write File: ' + dbfile)
-if not CLA.asRequestOnly:
+if not CLA.asRequestOnly or not CLA.DocumentationOnly:
     writeDB(dbfile, variables, maxPVLen)
+
+#Write Documentation
+if CLA.Documentation or CLA.DocumentationOnly:
+    if CLA.verbose:
+        print('Write File: ' + docfile)
+    writeDoc(docfile, dbfile, CLA.path_xml, variables, maxPVLen, MacroString)
