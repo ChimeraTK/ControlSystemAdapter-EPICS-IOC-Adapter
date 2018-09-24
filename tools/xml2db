@@ -88,7 +88,7 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict, repDot):
     typeConversion = dict([('int32', 'LONG'), ('uint32', 'ULONG'), ('int16', 'SHORT'), ('uint16', 'USHORT'), ('int8', 'CHAR'), ('uint8', 'UCHAR'), ('double', 'DOUBLE'), ('float', 'FLOAT'), ('string', 'STRING')])
     # Generating entries for db record with exeption handling, if necessary (i.e. description).
     dbEntry['PV'] = re.sub('\.',repDot,pv) # Replaces all periods (.) with underscores (_), to avoid invalid PV names.
-    dbEntry['DTYP'] = 'ChimeraTK' # FIXME: Is generic, might be extracted from .dbd?
+    dbEntry['DTYP'] = 'ChimeraTK' # TODO: Is generic, might be extracted from .dbd?
     
     try:
         description = xmlHandle.find(nsPrefix + ':description', nsDict).text
@@ -112,7 +112,7 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict, repDot):
     else:
         dbEntry['EGU'] = engineerunit
     
-    dbEntry['SCAN'] = '.1 second' # FIXME: Is generic. 
+    dbEntry['SCAN'] = '.1 second' # TODO: Is generic. 
     try:
         dbEntry['FTVL'] = typeConversion[xmlHandle.find(nsPrefix + ':value_type', nsDict).text]
     except KeyError:
@@ -216,7 +216,7 @@ def writeDoc(docfile, dbfile, xmlfile, records, maxLengthPV, macro):
         #write list of PV with descriptions
         for e in records:
             PVname = macro + shortenPV(e['PV'], maxLengthPV)
-            fh.write(PVname + ':\n\t' + e['DESC'] + '\n\n')
+            fh.write(PVname + ':\n\tDescription: ' + e['DESC'] + '\n\tData Type: ' + e['FTVL'] + '\n\tNumber of Elements: ' + str(e['numElements']) + '\n\n')
 
 
 def shortenPV(inPV, maxLength, sep='/', justCheck=False):
