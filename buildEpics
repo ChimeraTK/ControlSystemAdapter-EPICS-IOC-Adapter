@@ -23,7 +23,7 @@ fi
 
 echo "Starting the epics build..."
 cd "${EPICS_BASE}"
-make -j5 | grep -v "warning:"
+make -j5
 
 EPICS_ARCH=`grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//'`
 
