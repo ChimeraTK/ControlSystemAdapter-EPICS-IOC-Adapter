@@ -27,7 +27,7 @@ sed -e 's:EPICS_BASE=.\+:EPICS_BASE='${EPICS_BASE}':' "${AS_SOURCE}/configure/RE
 
 echo "Starting to build autosave..."
 cd "${PROJECT_BINARY_DIR}/autosave"
-make -j5
+make -j5 USR_CFLAGS=-w USR_CXXFLAGS=-w
  
 mkdir -p "${PROJECT_BINARY_DIR}/libs"
 cp "${PROJECT_BINARY_DIR}/autosave/lib/${EPICS_ARCH}/"*.a "${PROJECT_BINARY_DIR}/libs"

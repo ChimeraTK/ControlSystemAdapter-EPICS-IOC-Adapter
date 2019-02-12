@@ -23,7 +23,7 @@ fi
 
 echo "Starting the epics build..."
 cd "${EPICS_BASE}"
-make -j5
+make -j5 USR_CFLAGS=-w USR_CXXFLAGS=-w
 
 EPICS_ARCH=`grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//'`
 
