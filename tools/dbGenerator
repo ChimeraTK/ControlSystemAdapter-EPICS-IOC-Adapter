@@ -1,0 +1,213 @@
+#!/usr/bin/python3
+## Tool to generate EPICS PV database, autosave requirement file and documentation for PV database from a configuration xml-file and various sources
+## Written and tested for Python 3.5.2 @ June 2019 by Patrick Nonn for DESY/MSK
+
+import xml.etree.ElementTree as ET # xml parser
+import re # For regular expressions
+import sys
+import os # For file manipulation
+import argparse # Parse command line arguments
+import numpy as np
+
+VERSION = '0.1'
+
+'''
+Changelog:
+
+Unreleased:
+    Parsing of xml-files and extracting information for mapping
+'''
+## Class for text formatting
+class asciiformat:
+    bold = lambda text: '\033[1m' + text + '\033[0m'
+    warning = '\033[1m\033[93mWarning:\033[0m '
+    error = '\033[1m\033[91mError:\033[0m '
+
+## Specialized container class to hold and query structured data
+class table:
+    ## Constructor
+    def __init__(self, columnNames, contentList=None):
+        if not isinstance(columnNames, (list,str)): # Check for right attribute type
+            raise TypeError('The first attribute of table() has to be of type list or string!')
+        if isinstance(columnNames, str): # Conversion to list type if it is string
+            columnNames = [columnNames]
+        elif not all(map(lambda x: isinstance(x, str), columnNames)): # Check for list content being string
+            raise TypeError('The first attribute of table() has to be a list of strings!')
+        elif len(columnNames) != len(set(columnNames)): # Check for duplicates
+            raise AttributeError('The first attribute of table() can\'t contain duplicates!') 
+        else:
+            self._head = columnNames
+        if contentList != None: # Process content given at initialization
+            if not all(map(lambda x: isinstance(x, (list,dict)), contentList)): # Check types
+                raise TypeError('The second attribute of table() has to be None or a list of lists or dictionaries!')
+            if any(map(lambda x: len(x)<len(columnNames), contentList)): # Check lengths of items
+                raise AttributeError('The second attribute of table() has to be a list of lists or dictionaries, which are of the same length, as the first attribute!')
+            if all(map(lambda x: isinstance(x, dict), contentList)): # Process list of dictionaries
+                if any(map(lambda item: any(map(lambda col: all(map(lambda key: col != key, list(item.keys()))),columnNames)), contentList)): # Check, if all dictionaries in the content list contain the keys, defined in columnNames
+                    raise AttributeError('At least one dictionary misses at least one key, defined in the first attribute of table()!')
+                self._table = list(map(lambda item: list(map(lambda key: item[key], columnNames)), contentList)) # Convert list of uniform dictionaries to list of uniform lists
+            elif all(map(lambda x: isinstance(x, list), contentList)): # Process list of lists
+                self._table = contentList
+            else: # Something is very wrong, if we get here
+                raise AttributeError('The second attribute, if not None, has to be a list of ONLY lists or a list of ONLY dictionaries!')
+        else:
+            self._table = []
+        
+    
+    def __repr__(self): # Representation of table object
+        return 'Table object with ' + str(len(self._table)) + ' entries.'
+    
+    def __str__(self): # Printed output of table object
+        output=['\033[1m' + str(self._head) + '\033[0m']
+        for i in self._table:
+            output.append(str(i))
+        return '\n'.join(output)
+    
+    def __getitem__(self, col): # Magic method for "object['columnName']" accessor. Returns list of named columns content.
+        if col in self._head:
+            i = self._head.index(col)
+            output = []
+            for j in self._table:
+                output.append(j[i])
+            return output
+        else:
+            raise AttributeError('table has no column named "' + str(col) + '"')
+    
+    def __len__(self): # Magic method for len()-function, returns number of "rows"
+        return len(self._table)
+    
+    def __iter__(self): # Magic method to initialize iterator.
+        self._index = 0
+        self._row = None
+        return self
+    
+    def __next__(self): # Magic method to increment iterator.
+        if self._index > len(self._table) - 1:
+            del self._index
+            del self._row
+            raise StopIteration
+        else:
+            self._row = self._table[self._index]
+            output = dict(list(zip(self._head, self._row)))
+            self._index = self._index + 1
+            return output
+    
+    def add(self, row): # Method to add "row".
+        if not isinstance(row, dict):
+            raise TypeError('add_row() expects a dictionary as argument')
+        if len(row) < len(self._head):
+            raise ValueError('The argument of add_row has to be a dictionary with the length of at least ' + str(len(self._head)))
+        if any(map(lambda col: all(map(lambda key: col != key, list(row.keys()))),self._head)):
+            raise AttributeError('The dictionary given to table.add() misses at least one key, defined in the first attribute of table()!')
+        self._table.append(list(map(lambda key: row[key], self._head)))
+    
+    def query(self, column, value): # Method to search for "row(s)" containing defined value in defined column.
+        result = list(filter(lambda x: x[column] == value, self))
+        if len(result) == 0:
+            raise AttributeError(str(value) + ' does not exist in ' + str(column))
+        elif len(result) == 1:
+            return result[0]
+        else:
+            return table(self._head, result)
+    
+def makeIndex(xmlNode, nsPrefix, nsDict, pvPath = ''):
+    '''
+    Recursive function to iterate through the xml tree and isolate the 'variables' while maintaining the path in order to generate an index.
+    Takes:
+        xmlNode: xml handle to start the recursion
+        nsPrefix: Namespace prefix (without ':')
+        nsDict: Namespace dictionary, containing nsPrefix
+        pvPath: Path to the node, from which the function is called.
+    Returns:
+        index: dictionary, holding PV and handle for the corresponding 'variable'-node
+    '''
+    index = {}
+    for v in xmlNode.findall(nsPrefix + ':variable', nsDict):
+        index[pvPath + v.get('name')] = v
+    for d in xmlNode.findall(nsPrefix + ':directory', nsDict):
+        index.update(makeIndex(d, nsPrefix, nsDict, pvPath = pvPath + d.get('name') + '/'))
+    return index
+
+def findNode(xmlRoot, nsPrefix, nsDict, xPath):
+    '''
+    Returns address of directory-node, described in xPath. 
+    '''
+    nodes = [xmlRoot]
+    for node in xPath.split('/'):
+        temp = nodes[-1].findall(nsPrefix + ":directory[@name='" + node + "']", nsDict)
+        if len(temp) == 0:
+            sys.stderr.write(asciiformat.error + 'findNode: A "directory" node named ' + asciiformat.bold(node) + ' does not exist!\n\t' + xPath + ' can not be resolved.\n')
+        elif len(temp) > 1:
+            sys.stderr.write(asciiformat.warning + 'Multiple directory-nodes named ' + node + ' found. First one will be used!\n')
+        else:
+            nodes.append(temp[0])
+    return nodes[-1]
+
+CLAP=argparse.ArgumentParser(description='Generates EPICS PV database for every \'PV\' defined in ChimeraTK-xml file to EPICS database file.')
+CLAP.add_argument('-c', help='Path to configuration file. Defaults to "mapConfig.xml"', metavar='path')
+CLAP.add_argument('-v', help='Activates verbosity', action='store_true')
+# Parse Command Line Arguments
+CLA=CLAP.parse_args()
+
+## Handle CLI arguments
+# Handle default case
+if CLA.c == None:
+    inifilePath = os.getcwd()
+    inifileName = 'mapConfig.xml'
+else:
+    inifilePath, inifileName = os.path.split(os.path.abspath(CLA.c))
+    # Handle input of filename only
+    if inifilePath == None:
+        inifilePath = os.getcwd()
+# Handle invalid/nonexisting paths
+if not os.path.isdir(inifilePath):
+    sys.exit(asciiformat.error + 'Path ' + inifilePath + ' does not exist.')
+elif not os.path.isfile(os.path.join(inifilePath, inifileName)):
+    sys.exit(asciiformat.error + 'File ' + inifileName + ' does not exist.')
+
+## Parse config file os.path.join(inifilePath, inifileName)
+if CLA.v:
+    print("Reading: " + os.path.join(inifilePath, inifileName) + '\n')
+cfgTree = ET.parse(os.path.join(inifilePath, inifileName))
+cfgRoot = cfgTree.getroot()
+
+# Define namespace
+configNS={'EPICSmap' : 'https://github.com/ChimeraTK/ControlSystemAdapter-EPICS-IOC-Adapter'}
+# Get a list of all sourcefile entries
+sourcefiles = cfgRoot.findall("EPICSmap:sourcefile", configNS)
+
+# Check existance of sourcefile element(s) exist
+if len(sourcefiles) == 0:
+    sys.stderr.write(asciiformat.warning + 'No source files are defined!\n')
+else:
+    if CLA.v:
+        sourcelist=[]
+        for i in sourcefiles:
+            sourcelist.append(os.path.abspath(i.get("path")))
+        print('Found ' + str(len(sourcefiles)) + ' sources:\n- ' + '\n- '.join(sourcelist) + '\n')
+    xmlfile = dict()
+    alias = dict()
+    for s in sourcefiles:
+        # Check if sourcefile exists
+        if not os.path.isfile(s.get("path")):
+            sys.stderr.write(asciiformat.warning + "File \'" + os.path.abspath(s.get("path")) + "\' does not exist!\n")
+        # Parse source file according to type
+        sourceTag = s.get("label")
+        if s.get("type") == "xml-variables":
+            xmlfile[sourceTag] = dict()
+            xmlfile[sourceTag]['tree'] = ET.parse(s.get("path"))
+            xmlfile[sourceTag]['root'] = xmlfile[sourceTag]['tree'].getroot()
+            xmlfile[sourceTag]['ns'] = {sourceTag:s.get("namespace")}
+            xmlfile[sourceTag]['index'] = makeIndex(xmlfile[sourceTag]['root'], sourceTag, xmlfile[sourceTag]['ns'])
+            for item in s.findall('EPICSmap:alias', configNS):
+                alias[sourceTag + '.' + item.get('label')]=findNode(xmlfile['llrfctrl']['root'], 'llrfctrl', xmlfile['llrfctrl']['ns'], item.get('path'))
+                
+# Get a list of all outputfile entries
+outputFiles = cfgRoot.findall("EPICSmap:outputfile", configNS)
+outputList=table(['type', 'path', 'handle'])
+for i in outputFiles:
+    outputFile = {'path' : os.path.abspath(i.get('path')), 'type' : i.get('type'), 'handle' : i}
+    outputList.add(outputFile)
+if CLA.v:
+    print(str(len(outputList)) + ' output files are defined:\n' + str(outputList) + '\n')
+
