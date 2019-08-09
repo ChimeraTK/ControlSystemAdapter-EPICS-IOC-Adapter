@@ -17,6 +17,11 @@ Changelog:
 Unreleased:
     Parsing of xml-files and extracting information for mapping
 '''
+
+## Class to build structs
+class struct:
+    pass
+
 ## Class for text formatting
 class asciiformat:
     bold = lambda text: '\033[1m' + text + '\033[0m'
@@ -53,17 +58,19 @@ class table:
         else:
             self._table = []
         
-    
-    def __repr__(self): # Representation of table object
+    # Representation of table object
+    def __repr__(self):
         return 'Table object with ' + str(len(self._table)) + ' entries.'
     
-    def __str__(self): # Printed output of table object
+    # Printed output of table object
+    def __str__(self):
         output=['\033[1m' + str(self._head) + '\033[0m']
         for i in self._table:
             output.append(str(i))
         return '\n'.join(output)
     
-    def __getitem__(self, col): # Magic method for "object['columnName']" accessor. Returns list of named columns content.
+    # Magic method for "object['columnName']" accessor. Returns list of named columns content.
+    def __getitem__(self, col):
         if col in self._head:
             i = self._head.index(col)
             output = []
@@ -73,15 +80,18 @@ class table:
         else:
             raise AttributeError('table has no column named "' + str(col) + '"')
     
-    def __len__(self): # Magic method for len()-function, returns number of "rows"
+    # Magic method for len()-function, returns number of "rows"
+    def __len__(self):
         return len(self._table)
     
-    def __iter__(self): # Magic method to initialize iterator.
+    # Magic method to initialize iterator.
+    def __iter__(self):
         self._index = 0
         self._row = None
         return self
     
-    def __next__(self): # Magic method to increment iterator.
+    # Magic method to increment iterator.
+    def __next__(self):
         if self._index > len(self._table) - 1:
             del self._index
             del self._row
@@ -92,7 +102,8 @@ class table:
             self._index = self._index + 1
             return output
     
-    def add(self, row): # Method to add "row".
+    # Method to add "row".
+    def add(self, row):
         if not isinstance(row, dict):
             raise TypeError('add_row() expects a dictionary as argument')
         if len(row) < len(self._head):
@@ -101,7 +112,8 @@ class table:
             raise AttributeError('The dictionary given to table.add() misses at least one key, defined in the first attribute of table()!')
         self._table.append(list(map(lambda key: row[key], self._head)))
     
-    def query(self, column, value): # Method to search for "row(s)" containing defined value in defined column.
+    # Method to search for "row(s)" containing defined value in defined column.
+    def query(self, column, value):
         result = list(filter(lambda x: x[column] == value, self))
         if len(result) == 0:
             raise AttributeError(str(value) + ' does not exist in ' + str(column))
@@ -136,12 +148,100 @@ def findNode(xmlRoot, nsPrefix, nsDict, xPath):
     for node in xPath.split('/'):
         temp = nodes[-1].findall(nsPrefix + ":directory[@name='" + node + "']", nsDict)
         if len(temp) == 0:
-            sys.stderr.write(asciiformat.error + 'findNode: A "directory" node named ' + asciiformat.bold(node) + ' does not exist!\n\t' + xPath + ' can not be resolved.\n')
+            sys.stderr.write(asciiformat.error + 'findNode: A "directory" node named ' + asciiformat.bold(node) + ' does not exist!\n\t' + str(xPath) + ' can not be resolved.\n')
         elif len(temp) > 1:
             sys.stderr.write(asciiformat.warning + 'Multiple directory-nodes named ' + node + ' found. First one will be used!\n')
         else:
             nodes.append(temp[0])
     return nodes[-1]
+
+def getMacro(node, nsPrefix, nsDict):
+    '''
+    Returns a struct holding length and placeholder as defined in the FIRST "macro" tag under the xml.etree Element, given in "node"
+    "nsDict" is a dict holding "nsPrefix" and namespace(s) as key:value pairs.
+    '''
+    nodeType = node.tag.split('}')[-1]
+    if nodeType == 'outputfile':
+        whatami = asciiformat.bold('outputfile') + ' for ' + asciiformat.bold(node.get('path'))
+    elif nodeType == 'recordgroup':
+        whatami = asciiformat.bold('recordgroup') + ' of type ' + asciiformat.bold(node.get('type'))
+    elif nodeType == 'pv':
+        whatami = asciiformat.bold('pv') + ' named ' + asciiformat.bold(node.get('pvName'))
+    else:
+        whatami = asciiformat.bold('unknown')
+    output = struct()
+    output.node = node.find(nsPrefix + ':macro', nsDict)
+    if output.node == None:
+        output.length = 0
+        output.placeholder = ""
+    else:
+        tempLength = output.node.get('length')
+        tempPH = output.node.get('placeholder')
+        if tempLength == None:
+            sys.stderr.write(asciiformat.warning + 'The macro defined under element ' + whatami + ' holds no ' + asciiformat.bold('length') + ' parameter! (Typo?)\nThere will be no place reseved for this macro! Could result in overlong PV names!\n')
+            output.length = 0
+        else:
+            output.length = int(tempLength)
+        if tempPH == None:
+            sys.stderr.write(asciiformat.warning + 'The macro defined under element ' + whatami + ' holds no ' + asciiformat.bold('placeholder') + ' parameter! (Typo?)\nThere will no place be reseved for this macro! Could result in unexpected PV names!\n')
+            output.length = 0
+            output.placeholder = ""
+        else:
+            output.placeholder = str(output.node.get('placeholder'))
+    return output
+
+def getAutosave(node, nsPrefix, nsDict):
+    '''
+    Returns a boolean as defined in the FIRST "autosave" tag under the xml.etree Element, given in "node".
+    "nsDict" is a dict holding "nsPrefix" and namespace(s) as key:value pairs.
+    '''
+    nodeType = node.tag.split('}')[-1]
+    if nodeType == 'outputfile':
+        whatami = asciiformat.bold('outputfile') + ' for ' + asciiformat.bold(node.get('path'))
+    elif nodeType == 'recordgroup':
+        whatami = asciiformat.bold('recordgroup') + ' of type ' + asciiformat.bold(node.get('type'))
+    elif nodeType == 'pv':
+        whatami = asciiformat.bold('pv') + ' named ' + asciiformat.bold(node.get('pvName'))
+    else:
+        whatami = asciiformat.bold('unknown')
+    output = struct()
+    output.node = node.find(nsPrefix + ':autosave', nsDict)
+    if output.node == None:
+        output.active = None
+    elif output.node.get('isActive') == None:
+        sys.stderr.write(asciiformat.warning + 'Autosave defined under element ' + whatami + ' holds no ' + asciiformat.bold('isActive') + ' parameter! (Typo?)\nAutosave will be ignored!\n')
+        output.active = None
+    elif output.node.get('isActive').lower() not in ['true', 'false']:
+        sys.stderr.write(asciiformat.warning + 'Autosave defined under element ' + whatami + ' holds no ' + asciiformat.bold('isActive') + ' parameter! (Typo?)\nAutosave will be ignored!\n')
+        output.active = None
+    else:
+        output.active = {'true':True, 'false':False}[output.node.get('isActive').lower()]
+    return output.active
+
+def getFields(node, nsPrefix, nsDict):
+    '''
+    Returns a dictionary holding all "field" tags type:value attributes under the xml.etree Element, given in "node" as key:value pairs.
+    "nsDict" is a dict holding "nsPrefix" and namespace(s) as key:value pairs.
+    '''
+    nodeType = node.tag.split('}')[-1]
+    if nodeType == 'outputfile':
+        whatami = asciiformat.bold('outputfile') + ' for ' + asciiformat.bold(node.get('path'))
+    elif nodeType == 'recordgroup':
+        whatami = asciiformat.bold('recordgroup') + ' of type ' + asciiformat.bold(node.get('type'))
+    elif nodeType == 'pv':
+        whatami = asciiformat.bold('pv') + ' named ' + asciiformat.bold(node.get('pvName'))
+    else:
+        whatami = asciiformat.bold('unknown')
+    output = dict()
+    fieldNodes = node.findall(nsPrefix + ':field', nsDict)
+    for field in fieldNodes:
+        fieldType = field.get('type')
+        fieldValue = field.get('value')
+        if fieldType == None or fieldValue == None:
+            sys.stderr.write(asciiformat.warning + 'Field defined under element ' + whatami + ' holds no ' + asciiformat.bold('type') + ' and/or ' + asciiformat.bold('value') + ' parameter! (Typo?)\nField will be ignored!\n')
+        else:
+            output[fieldType] = fieldValue # Fields of the same type overwrite!
+    return output
 
 CLAP=argparse.ArgumentParser(description='Generates EPICS PV database for every \'PV\' defined in ChimeraTK-xml file to EPICS database file.')
 CLAP.add_argument('-c', help='Path to configuration file. Defaults to "mapConfig.xml"', metavar='path')
@@ -200,8 +300,8 @@ else:
             xmlfile[sourceTag]['ns'] = {sourceTag:s.get("namespace")}
             xmlfile[sourceTag]['index'] = makeIndex(xmlfile[sourceTag]['root'], sourceTag, xmlfile[sourceTag]['ns'])
             for item in s.findall('EPICSmap:alias', configNS):
-                alias[sourceTag + '.' + item.get('label')]=findNode(xmlfile['llrfctrl']['root'], 'llrfctrl', xmlfile['llrfctrl']['ns'], item.get('path'))
-                
+                alias[sourceTag + '.' + item.get('label')]=findNode(xmlfile[sourceTag]['root'], sourceTag, xmlfile[sourceTag]['ns'], item.get('path'))
+
 # Get a list of all outputfile entries
 outputFiles = cfgRoot.findall("EPICSmap:outputfile", configNS)
 outputList=table(['type', 'path', 'handle'])
@@ -211,3 +311,32 @@ for i in outputFiles:
 if CLA.v:
     print(str(len(outputList)) + ' output files are defined:\n' + str(outputList) + '\n')
 
+for outFile in outputList:
+    macro_rgroup = struct()
+    macro_rgroup.length = 0
+    macro_rgroup.placeholder = ""
+    autosave_rgroup = None
+    fields_rgroup = dict()
+    if outFile['type'] == 'db':
+        node=outFile['handle']
+        # process attributes for the whole file
+        macro_file = getMacro(node, 'EPICSmap', configNS)
+        autosave_file = {None:False, False:False, True:True}[getAutosave(node, 'EPICSmap', configNS)]
+        fields_file = getFields(node, 'EPICSmap', configNS)
+        ## process recordgroups
+        rgroupList = node.findall('EPICSmap' + ':recordgroup', configNS)
+        for rgroupNode in rgroupList:
+            macro_temp = getMacro(rgroupNode, 'EPICSmap', configNS)
+            if macro_temp.node != None:
+                macro_rgroup = macro_temp
+            else:
+                macro_rgroup = macro_file
+            autosave_temp = getAutosave(rgroupNode, 'EPICSmap', configNS)
+            if autosave_temp != None:
+                autosave_rgroup = autosave_temp
+            else:
+                autosave_rgroup = autosave_file
+            fields_rgroup = fields_file
+            fields_rgroup.update(getFields(rgroupNode, 'EPICSmap', configNS))
+            
+        print(str(macro_rgroup.length) + '\t' + macro_rgroup.placeholder + '\n' + str(autosave_rgroup) + '\n' + str(fields_rgroup))
