@@ -8,13 +8,14 @@ import sys
 import os # For file manipulation
 import argparse # Parse command line arguments
 
-VERSION = '1.2'
+VERSION = '1.2.1'
 
 # changelog:
 # 1.0: First working version
 # 1.1: Added replacement of periods in PV names
 # 1.1: Added exception handling for unexpected entries in xml file
 # 1.2: Added feature: Generation of "documentation" file
+# 1.2.1: Changed field SCAN from generic .1 seconds to passive for input and .5 for output PVs
 
 def makeIndex(xmlNode, nsPrefix, nsDict, pvPath = ''):
     '''
@@ -112,7 +113,6 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict, repDot):
     else:
         dbEntry['EGU'] = engineerunit
     
-    dbEntry['SCAN'] = '.1 second' # TODO: Is generic. 
     try:
         dbEntry['FTVL'] = typeConversion[xmlHandle.find(nsPrefix + ':value_type', nsDict).text]
     except KeyError:
@@ -137,6 +137,7 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict, repDot):
     
     if  Direction == 'application_to_control_system':
         dbEntry['dir'] = 'INP'
+        dbEntry['SCAN'] = 'passive'
         if dbEntry['numElements'] == 1:
             if dbEntry['FTVL'] in ['LONG', 'ULONG', 'SHORT', 'USHORT', 'CHAR', 'UCHAR']:
                 dbEntry['recordType'] = 'longin'
@@ -156,6 +157,7 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict, repDot):
                 return None
     elif Direction == 'control_system_to_application':
         dbEntry['dir'] = 'OUT'
+        dbEntry['SCAN'] = '.5 second'
         if dbEntry['numElements'] == 1:
             if dbEntry['FTVL'] in ['LONG', 'ULONG', 'SHORT', 'USHORT', 'CHAR', 'UCHAR']:
                 dbEntry['recordType'] = 'longout'

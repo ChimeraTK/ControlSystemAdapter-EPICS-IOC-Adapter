@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<EPICSdb xmlns="https://github.com/ChimeraTK/ControlSystemAdapter-EPICS-IOC-Adapter" application="llrfctrl">
+    <!-- The sourcefile element holds the information necassary to parse the file -->
+    <sourcefile type="xml-variables" path="../../../build/llrfctrl/llrfctrl.xml" namespace="https://github.com/ChimeraTK/ApplicationCore" label="llrfctrl">
+        <alias varLabel="Srv" xmlPath="Server" />
+        <alias varLabel="Srv/MDAQ" xmlPath="Server/MicroDaq" />
+        <alias varLabel="Srv/DLC" xmlPath="Server/DataLossCounter" />
+        <alias varLabel="Srv/Version" xmlPath="Server/Version" />
+        <alias varLabel="Config" xmlPath="Configuration" />
+        <alias varLabel="Config/LS" xmlPath="Configuration/LengthScaled" />
+        <alias varLabel="Config/CC" xmlPath="Configuration/CommonCalibration" />
+        <alias varLabel="Config/SP" xmlPath="Configuration/SamplingPosition" />
+        <alias varLabel="Adc0" xmlPath="AdcBoard0" />
+        <alias varLabel="Adc0/Ch0" xmlPath="AdcBoard0/Channel0" />
+        <alias varLabel="Adc0/Ch0/Cal" xmlPath="AdcBoard0/Channel0/Calibration" />
+        <alias varLabel="Adc0/Ch0/CCal" xmlPath="AdcBoard0/Channel0/Calibration/CommonCalibration" />
+        <alias varLabel="Adc0/Ch0/Filter" xmlPath="AdcBoard0/Channel0/Filter" />
+        <alias varLabel="Adc0/Ch0/SFT" xmlPath="AdcBoard0/Channel0/SamplesFlattop" />
+        <alias varLabel="Adc0/Ch0/Stat" xmlPath="AdcBoard0/Channel0/Statistics" />
+        <alias varLabel="Adc0/Ch1" xmlPath="AdcBoard0/Channel1" />
+        <alias varLabel="Adc0/Ch1/Cal" xmlPath="AdcBoard0/Channel1/Calibration" />
+        <alias varLabel="Adc0/Ch1/CCal" xmlPath="AdcBoard0/Channel1/Calibration/CommonCalibration" />
+        <alias varLabel="Adc0/Ch1/Filter" xmlPath="AdcBoard0/Channel1/Filter" />
+        <alias varLabel="Adc0/Ch1/SFT" xmlPath="AdcBoard0/Channel1/SamplesFlattop" />
+        <alias varLabel="Adc0/Ch1/Stat" xmlPath="AdcBoard0/Channel1/Statistics" />
+        <alias varLabel="Adc0/Ch2" xmlPath="AdcBoard0/Channel2" />
+        <alias varLabel="Adc0/Ch2/Cal" xmlPath="AdcBoard0/Channel2/Calibration" />
+        <alias varLabel="Adc0/Ch2/CCal" xmlPath="AdcBoard0/Channel2/Calibration/CommonCalibration" />
+        <alias varLabel="Adc0/Ch2/Filter" xmlPath="AdcBoard0/Channel2/Filter" />
+        <alias varLabel="Adc0/Ch2/SFT" xmlPath="AdcBoard0/Channel2/SamplesFlattop" />
+        <alias varLabel="Adc0/Ch2/Stat" xmlPath="AdcBoard0/Channel2/Statistics" />
+        <alias varLabel="Adc0/Ch3" xmlPath="AdcBoard0/Channel3" />
+        <alias varLabel="Adc0/Ch3/Cal" xmlPath="AdcBoard0/Channel3/Calibration" />
+        <alias varLabel="Adc0/Ch3/CCal" xmlPath="AdcBoard0/Channel3/Calibration/CommonCalibration" />
+        <alias varLabel="Adc0/Ch3/Filter" xmlPath="AdcBoard0/Channel3/Filter" />
+        <alias varLabel="Adc0/Ch3/SFT" xmlPath="AdcBoard0/Channel3/SamplesFlattop" />
+        <alias varLabel="Adc0/Ch3/Stat" xmlPath="AdcBoard0/Channel3/Statistics" />
+        <alias varLabel="Adc0/Ch4" xmlPath="AdcBoard0/Channel4" />
+        <alias varLabel="Adc0/Ch4/Cal" xmlPath="AdcBoard0/Channel4/Calibration" />
+        <alias varLabel="Adc0/Ch4/CCal" xmlPath="AdcBoard0/Channel4/Calibration/CommonCalibration" />
+        <alias varLabel="Adc0/Ch4/Filter" xmlPath="AdcBoard0/Channel4/Filter" />
+        <alias varLabel="Adc0/Ch4/SFT" xmlPath="AdcBoard0/Channel4/SamplesFlattop" />
+        <alias varLabel="Adc0/Ch4/Stat" xmlPath="AdcBoard0/Channel4/Statistics" />
+        <alias varLabel="Adc0/Ch5" xmlPath="AdcBoard0/Channel5" />
+        <alias varLabel="Adc0/Ch5/Cal" xmlPath="AdcBoard0/Channel5/Calibration" />
+        <alias varLabel="Adc0/Ch5/CCal" xmlPath="AdcBoard0/Channel5/Calibration/CommonCalibration" />
+        <alias varLabel="Adc0/Ch5/Filter" xmlPath="AdcBoard0/Channel5/Filter" />
+        <alias varLabel="Adc0/Ch5/SFT" xmlPath="AdcBoard0/Channel5/SamplesFlattop" />
+        <alias varLabel="Adc0/Ch5/Stat" xmlPath="AdcBoard0/Channel5/Statistics" />
+        <alias varLabel="Adc0/Ch6" xmlPath="AdcBoard0/Channel6" />
+        <alias varLabel="Adc0/Ch6/Cal" xmlPath="AdcBoard0/Channel6/Calibration" />
+        <alias varLabel="Adc0/Ch6/CCal" xmlPath="AdcBoard0/Channel6/Calibration/CommonCalibration" />
+        <alias varLabel="Adc0/Ch6/Filter" xmlPath="AdcBoard0/Channel6/Filter" />
+        <alias varLabel="Adc0/Ch6/SFT" xmlPath="AdcBoard0/Channel6/SamplesFlattop" />
+        <alias varLabel="Adc0/Ch6/Stat" xmlPath="AdcBoard0/Channel6/Statistics" />
+        <alias varLabel="Adc0/Ch7" xmlPath="AdcBoard0/Channel7" />
+        <alias varLabel="Adc0/Ch7/Cal" xmlPath="AdcBoard0/Channel7/Calibration" />
+        <alias varLabel="Adc0/Ch7/CCal" xmlPath="AdcBoard0/Channel7/Calibration/CommonCalibration" />
+        <alias varLabel="Adc0/Ch7/Filter" xmlPath="AdcBoard0/Channel7/Filter" />
+        <alias varLabel="Adc0/Ch7/SFT" xmlPath="AdcBoard0/Channel7/SamplesFlattop" />
+        <alias varLabel="Adc0/Ch7/Stat" xmlPath="AdcBoard0/Channel7/Statistics" />
+
+    </sourcefile>
+    
+    <outputfile type="db" path="Logic.db">
+        <macro length="10" placeholder="$(P)"/>
+        <autosave isActive="false"/>
+        <field type="test1" value="foo1"/>
+        <field type="test2" value="foo2"/>
+        <field type="test3" value="foo3"/>
+        <field type="test2" value="foo4"/>
+        <recordgroup type="aai">
+            <field type="DTYP" value="ChimeraTK"/>
+            <autosave isActive='true'/>
+            <record pvName="Srv/triggerNr" source="llrfctrl.Srv/triggerNumber">
+                <field type="SCAN" value=".1"/>
+            </record>
+        </recordgroup>
+    </outputfile>
+    <outputfile type="db" path="Channel.db">
+        <macro length="11" placeholder="$(P)/$(C)"/>
+    </outputfile>
+    <outputfile type="req" path="all.req"/>
+    <outputfile type="doc" path="llrf.md"/>
+</EPICSdb>
