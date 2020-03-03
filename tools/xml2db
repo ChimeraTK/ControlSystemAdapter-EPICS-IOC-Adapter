@@ -137,7 +137,7 @@ def genDbEntry(pv, xmlHandle, nsPrefix, nsDict, repDot):
     
     if  Direction == 'application_to_control_system':
         dbEntry['dir'] = 'INP'
-        dbEntry['SCAN'] = 'passive'
+        dbEntry['SCAN'] = 'Passive'
         if dbEntry['numElements'] == 1:
             if dbEntry['FTVL'] in ['LONG', 'ULONG', 'SHORT', 'USHORT', 'CHAR', 'UCHAR']:
                 dbEntry['recordType'] = 'longin'
