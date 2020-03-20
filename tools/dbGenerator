@@ -1,13 +1,16 @@
 #!/usr/bin/python3
-## Tool to generate EPICS PV database, autosave requirement file and documentation for PV database from a configuration xml-file and various sources
-## Written and tested for Python 3.5.2 @ June 2019 by Patrick Nonn for DESY/MSK
 
-import xml.etree.ElementTree as ET # xml parser
-import re # For regular expressions
+"""
+Tool to generate EPICS PV database, autosave requirement file and documentation for PV database
+from a configuration xml-file and various other sources
+Written and tested for Python 3.5.2 @ June 2019 by Patrick Nonn for DESY/MSK
+"""
+
+import argparse  # Parse command line arguments
+import os  # For file manipulation
 import sys
-import os # For file manipulation
-import argparse # Parse command line arguments
-import numpy as np
+import xml.etree.ElementTree as xmlEleTree  # xml parser
+from typing import List, Any
 
 VERSION = '0.1'
 
@@ -18,86 +21,99 @@ Unreleased:
     Parsing of xml-files and extracting information for mapping
 '''
 
-## Class to build structs
-class struct:
+
+# Class to build structs
+class Struct:
     pass
 
-## Class for text formatting
-class asciiformat:
-    bold = lambda text: '\033[1m' + text + '\033[0m'
+
+# Class for text formatting
+class AsciiFormat:
     warning = '\033[1m\033[93mWarning:\033[0m '
     error = '\033[1m\033[91mError:\033[0m '
 
-## Define Exception
+    @staticmethod
+    def bold(text):
+        return '\033[1m' + text + '\033[0m'
+
+
+# Define Exception
 class XmlNodeError(Exception):
     """Exception raised, if xml-node invalid"""
-    
-    def __init__(self, xPath, message):
-        self.xPath = xPath
-        self.message = message
 
-## Specialized container class to hold and query structured data
-class table:
-    ## Constructor
-    def __init__(self, columnNames, contentList=None):
-        if not isinstance(columnNames, (list,str)): # Check for right attribute type
+    def __init__(self, xpath, message):
+        self.xPath = xpath
+        self.Message = message
+
+
+class Table:
+    """Container class for structured data in table format. Data added in rows, but can be accessed by column name."""
+
+    # Constructor
+    def __init__(self, column_names, content_list=None):
+        if not isinstance(column_names, (list, str)):  # Check for right attribute type
             raise TypeError('The first attribute of table() has to be of type list or string!')
-        if isinstance(columnNames, str): # Conversion to list type if it is string
-            columnNames = [columnNames]
-        elif not all(map(lambda x: isinstance(x, str), columnNames)): # Check for list content being string
+        if isinstance(column_names, str):  # Conversion to list type if it is string
+            column_names = [column_names]
+        elif not all(map(lambda x: isinstance(x, str), column_names)):  # Check for list content being string
             raise TypeError('The first attribute of table() has to be a list of strings!')
-        elif len(columnNames) != len(set(columnNames)): # Check for duplicates
-            raise AttributeError('The first attribute of table() can\'t contain duplicates!') 
+        elif len(column_names) != len(set(column_names)):  # Check for duplicates
+            raise AttributeError('The first attribute of table() can\'t contain duplicates!')
         else:
-            self._head = columnNames
-        if contentList != None: # Process content given at initialization
-            if not all(map(lambda x: isinstance(x, (list,dict)), contentList)): # Check types
+            self._head = column_names
+        if content_list is not None:  # Process content given at initialization
+            if not all(map(lambda x: isinstance(x, (list, dict)), content_list)):  # Check types
                 raise TypeError('The second attribute of table() has to be None or a list of lists or dictionaries!')
-            if any(map(lambda x: len(x)<len(columnNames), contentList)): # Check lengths of items
-                raise AttributeError('The second attribute of table() has to be a list of lists or dictionaries, which are of the same length, as the first attribute!')
-            if all(map(lambda x: isinstance(x, dict), contentList)): # Process list of dictionaries
-                if any(map(lambda item: any(map(lambda col: all(map(lambda key: col != key, list(item.keys()))),columnNames)), contentList)): # Check, if all dictionaries in the content list contain the keys, defined in columnNames
-                    raise AttributeError('At least one dictionary misses at least one key, defined in the first attribute of table()!')
-                self._table = list(map(lambda item: list(map(lambda key: item[key], columnNames)), contentList)) # Convert list of uniform dictionaries to list of uniform lists
-            elif all(map(lambda x: isinstance(x, list), contentList)): # Process list of lists
-                self._table = contentList
-            else: # Something is very wrong, if we get here
-                raise AttributeError('The second attribute, if not None, has to be a list of ONLY lists or a list of ONLY dictionaries!')
+            if any(map(lambda x: len(x) < len(column_names), content_list)):  # Check lengths of items
+                raise AttributeError('The second attribute of table() has to be a list of lists or dictionaries, '
+                                     'which are of the same length, as the first attribute!')
+            if all(map(lambda x: isinstance(x, list), content_list)):  # Process list of lists
+                for row in content_list:
+                    # Check, if row has the required length
+                    if len(row) != len(self._head):
+                        sys.stderr.write('At least one list has not the right length!')
+                    else:
+                        # Convert list of uniform lists to list of uniform dictionaries
+                        self.add(dict(zip(self._head, row)))
+            elif all(map(lambda x: isinstance(x, list), content_list)):  # Process list of lists
+                self._table = content_list
+            else:  # Something is very wrong, if we get here
+                raise AttributeError('The second attribute, if not None, has to be a list of ONLY lists or a list of '
+                                     'ONLY dictionaries!')
         else:
             self._table = []
-        
+
     # Representation of table object
     def __repr__(self):
         return 'Table object with ' + str(len(self._table)) + ' entries.'
-    
+
     # Printed output of table object
     def __str__(self):
-        output=['\033[1m' + str(self._head) + '\033[0m']
-        for i in self._table:
-            output.append(str(i))
+        output = ['\033[1m' + str(self._head) + '\033[0m']
+        for table_row in self._table:
+            output.append(list(table_row.values()))
         return '\n'.join(output)
-    
+
     # Magic method for "object['columnName']" accessor. Returns list of named columns content.
     def __getitem__(self, col):
         if col in self._head:
-            i = self._head.index(col)
-            output = []
-            for j in self._table:
-                output.append(j[i])
+            output = []  # type: List[Any]
+            for table_row in self._table:
+                output.append(table_row[col])
             return output
         else:
             raise AttributeError('table has no column named "' + str(col) + '"')
-    
+
     # Magic method for len()-function, returns number of "rows"
     def __len__(self):
         return len(self._table)
-    
+
     # Magic method to initialize iterator.
     def __iter__(self):
         self._index = 0
         self._row = None
         return self
-    
+
     # Magic method to increment iterator.
     def __next__(self):
         if self._index > len(self._table) - 1:
@@ -106,334 +122,404 @@ class table:
             raise StopIteration
         else:
             self._row = self._table[self._index]
-            output = dict(list(zip(self._head, self._row)))
+            output = self._row
             self._index = self._index + 1
             return output
-    
+
     # Method to add "row".
     def add(self, row):
-        if not isinstance(row, dict):
+        if not isinstance(row, dict):  # Check Type
             raise TypeError('table.add() expects a dictionary as argument')
-        if len(row) < len(self._head):
-            raise ValueError('The argument of add_row has to be a dictionary with the length of at least ' + str(len(self._head)))
-        if any(map(lambda col: all(map(lambda key: col != key, list(row.keys()))),self._head)):
-            raise AttributeError('The dictionary given to table.add() misses at least one key, defined in the first attribute of table()!')
-        self._table.append(list(map(lambda key: row[key], self._head)))
-    
+        if len(row) < len(self._head):  # Check length
+            raise ValueError('The argument of add_row has to be a dictionary with the length of at least '
+                             + str(len(self._head)))
+        if any(map(lambda col:
+                   all(map(lambda key:
+                           col != key, list(row.keys()))),
+                   self._head)):  # Check keys
+            raise AttributeError('The dictionary given to table.add() misses at least one key, defined in the first '
+                                 'attribute of table()!')
+        self._table.append(row)
+
     # Method to search for "row(s)" containing defined pattern, which can be a dict or a string.
     def query(self, pattern):
+        result = []
         if not isinstance(pattern, (dict, str)):
             raise TypeError('table.query() takes a dict or a string as argument!')
         elif isinstance(pattern, dict):
-            result = self._table
-            for item in pattern:
-                if item in self._head:
-                    itemIndex = self._head.index(item)
-                    result = list(filter(lambda x: x[itemIndex] == pattern[item], result))
+            result += self._table
+            for pattern_key in pattern:
+                if pattern_key in self._head:
+                    result = list(filter(lambda x: x[pattern_key] == pattern[pattern_key], result))
         elif isinstance(pattern, str):
-            result = []
-            for ind in range(0, len(self._head)):
-                result += list(filter(lambda x: x[ind] == pattern, self._table))
-        if len(result) == 0: # Generate empty table, if no results were found.
-            return table(self._head, None)
-        else:
-            return table(self._head, result)
+            for head_key in self._head:
+                result += list(filter(lambda x: x[head_key] == pattern, self._table))
+        return result
 
-## Class to hold structured data after extraction from source files and added meta information
-class sourcedata:
-    ## Constructor
-    def __init__(self, tableVar, dictAlias=dict()):
-        if isinstance(tableVar, table):
-            self.variables = tableVar
-        else:
-            raise TypeError('Sourcedata expects a table as argument!')
-        if isinstance(dictAlias, dict):
-            self.aliases = dictAlias
-        else:
-            raise TypeError('Sourcedata expects a dictionary as aliases!')
-    
-    ## Recursion to expand all aliases in String
-    def _expand(inStr):
-        if isinstance(inStr,str):
-            posOpen = inStr.find("{")
-            if posOpen != -1:
-                posClose = inStr.find("}",posOpen+1)
-                if posClose == -1:
-                    return inStr
+
+class PVDb(Table):
+    """Main container for data from all sources"""
+
+    def __init__(self):
+        super().__init__(['ID', 'pvName', 'autosave', 'doku', 'fields'], None)
+        self._aliases = {}
+
+    # Magic method for "object['columnName']" accessor. Returns list of named columns content.
+    def __getitem__(self, pv_id):
+        if not isinstance(pv_id, str):  # Check Type
+            raise TypeError('Attribute of PVDb[] has to be string.')
+        query_result = super().query({'ID': pv_id})  # Find Entry
+        if len(query_result) == 0:  # Check existence
+            sys.stderr.write('PV with ID ' +
+                             pv_id +
+                             ' does not exist in PVDb')
+        elif len(query_result) == 1:  # Usual case
+            index = self._table.index(query_result[0])
+            return self._table[index]
+        elif len(query_result) >= 1:  # Check Multiple Entries
+            sys.stderr.write('Multipe PVs with ID ' +
+                             pv_id +
+                             ' found in PVDb! PVDb might be corrupted!')
+        else:  # For unforeseen cases
+            raise RuntimeError('Something has gone wrong!')
+
+    # Method to add rows to database
+    def add(self, row):
+        if not isinstance(row, dict):  # Check Type
+            raise TypeError('PVDb.add() expects a dictionary as argument')
+        if len(row) < len(self._head):  # Check Length
+            raise ValueError('The argument of add_row has to be a dictionary with the length of at least '
+                             + str(len(self._head)))
+        if any(map(lambda col:
+                   all(map(lambda key:
+                           col != key, list(row.keys()))),
+                   self._head)):  # Check Keys
+            raise AttributeError('The attribute of PVDb.add() misses at least one of the following keys:\n' +
+                                 str(self._head))
+        super().add(row)
+
+    def _expand(self, in_str):
+        if isinstance(in_str, str):
+            pos_open = in_str.find("{")
+            if pos_open != -1:
+                pos_close = in_str.find("}", pos_open + 1)
+                if pos_close == -1:
+                    return in_str
             else:
-                return inStr
+                return in_str
             try:
-                if posClose-posOpen > 1: # Check for empty curly brackets
-                    macro = self.aliases[inStr[posOpen+1:posClose]]
+                if pos_close - pos_open > 1:  # Check for empty curly brackets
+                    macro = self._aliases[in_str[pos_open + 1:pos_close]]
                 else:
-                    sys.stderr.write(asciiformat.warning
-                                     +'Empty alias in '
-                                     +asciiformat.bold(inStr)
-                                     +' will be ignored!\n')
+                    sys.stderr.write(AsciiFormat.warning +
+                                     'Empty Macro in string "' +
+                                     in_str +
+                                     '" will be ignored!\n')
                     macro = ''
             except KeyError:
-                sys.stderr.write(asciiformat.error
-                                 +'Alias '
-                                 +asciiformat.bold(inStr[posOpen+1:posClose])
-                                 +' is not defined! It will be ignored!\n')
+                sys.stderr.write(AsciiFormat.warning +
+                                 'Macro ' +
+                                 in_str[pos_open:pos_close + 1] +
+                                 ' not defined, and will be ignored!\n')
                 macro = ''
-            out = self._expand(inStr[:posOpen] + macro + inStr[posClose+1:])
+            out = self._expand(in_str[:pos_open] + macro + in_str[pos_close + 1:])
+        else:
+            raise TypeError('The _expand method of ' + self.__name__)
         return out
-    
-    ## Magic method for []-accessor 
-    def __getitem__(self, match):
-        if isinstance(match,str):
-            query = self._expand(match)
-            
-        
-def expandAlias(inString, aliasDict):
-    '''
-    Function to expand aliases
-    '''
-    posOpen = inString.find("{")
-    if posOpen != -1:
-        posClose = inString.find("}",posOpen+1)
-        if posClose == -1:
-            return inString
-    else:
-        return inString
-    macro = aliasDict[inString[posOpen+1:posClose]]
-    temp = inString[:posOpen] + macro + inString[posClose+1:]
-    out = expandAlias(temp, aliasDict)
-    return out    
 
-def makeIndex(xmlNode, nsPrefix, nsDict, pvPath = ''):
-    '''
-    Recursive function to iterate through the xml tree and isolate the 'variables' while maintaining the path in order to generate an index.
+
+def expand_alias(in_string, alias_dict):
+    """Function to expand aliases"""
+
+    pos_open = in_string.find("{")
+    if pos_open != -1:
+        pos_close = in_string.find("}", pos_open + 1)
+        if pos_close == -1:
+            return in_string
+    else:
+        return in_string
+    macro = alias_dict[in_string[pos_open + 1:pos_close]]
+    temp = in_string[:pos_open] + macro + in_string[pos_close + 1:]
+    out = expand_alias(temp, alias_dict)
+    return out
+
+
+def make_index(xml_node, ns_prefix, ns_dict, pv_path=''):
+    """
+    Recursive function to iterate through the xml tree and isolate the 'variables'
+    while maintaining the path in order to generate an index.
     Takes:
-        xmlNode: xml handle to start the recursion
-        nsPrefix: Namespace prefix (without ':')
-        nsDict: Namespace dictionary, containing nsPrefix
-        pvPath: Path to the node, from which the function is called.
+        xml_node: xml handle to start the recursion
+        ns_prefix: Namespace prefix (without ':')
+        ns_dict: Namespace dictionary, containing nsPrefix
+        pv_path: Path to the node, from which the function is called.
     Returns:
         index: dictionary, holding xpath and handle for the corresponding 'variable'-node
-    '''
+    """
     index = {}
-    for v in xmlNode.findall(nsPrefix + ':variable', nsDict):
-        index[pvPath + v.get('name')] = v
-    for d in xmlNode.findall(nsPrefix + ':directory', nsDict):
-        index.update(makeIndex(d, nsPrefix, nsDict, pvPath = pvPath + d.get('name') + '/'))
+    for v in xml_node.findall(ns_prefix + ':variable', ns_dict):
+        index[pv_path + v.get('name')] = v
+    for d in xml_node.findall(ns_prefix + ':directory', ns_dict):
+        index.update(make_index(d, ns_prefix, ns_dict, pv_path=pv_path + d.get('name') + '/'))
     return index
 
-def processXmlVariable(sourceHandle):
-    '''
+
+def process_xml_variable(source_handle):
+    """
     Processes source file, defined in 'sourcefile' tag, with type 'xml-variables'.
     Returns table holding the content of sourcefile.
-    '''
-    if sourceHandle.get("type") != "xml-variables":
-        raise XmlNodeError(sourceHandle.tag, 'sourcefile is not defined as type = xml-variables.')
+    """
+    if source_handle.get("type") != "xml-variables":
+        raise XmlNodeError(source_handle.tag, 'sourcefile is not defined as type = xml-variables.')
     # Dictionary to convert c types into EPICS counterparts
-    typeConversion = {'int32':'LONG',
-                      'uint32':'ULONG',
-                      'int16':'SHORT',
-                      'uint16':'USHORT',
-                      'int8':'CHAR',
-                      'uint8':'UCHAR',
-                      'double':'DOUBLE',
-                      'float':'FLOAT',
-                      'string':'STRING'}
+    type_conversion = {'int64': 'INT64',
+                       'uint64': 'UINT64',
+                       'int32': 'LONG',
+                       'uint32': 'ULONG',
+                       'int16': 'SHORT',
+                       'uint16': 'USHORT',
+                       'int8': 'CHAR',
+                       'uint8': 'UCHAR',
+                       'double': 'DOUBLE',
+                       'float': 'FLOAT',
+                       'string': 'STRING'}
     # Dictionary to convert "direction" to EPICS IN/OUT
-    direction = {'control_system_to_application':'OUTPUT',
-                 'control_system_to_application_with_return':'OUTPUT',
-                 'application_to_control_system':'INPUT',
-                 'application_to_control_system_with_return':'INPUT'}
+    direction = {'control_system_to_application': 'OUTPUT',
+                 'control_system_to_application_with_return': 'OUTPUT',
+                 'application_to_control_system': 'INPUT',
+                 'application_to_control_system_with_return': 'INPUT'}
     # Initialize output table
-    out = table(['VariablePath', 'ValueType', 'NumberOfElements', 'Direction', 'Unit', 'Description'])
+    out = Table(['VariablePath', 'ValueType', 'NumberOfElements', 'Direction', 'Unit', 'Description'])
     # Getting xml parsing essentials
-    label = sourceHandle.get("label")
-    tree = ET.parse(sourceHandle.get("path"))
+    label = source_handle.get("label")
+    tree = xmlEleTree.parse(source_handle.get("path"))
     root = tree.getroot()
-    namespace = {label:sourceHandle.get("namespace")}
+    namespace = {label: source_handle.get("namespace")}
     # Indexing "variables" in xml file
-    index = makeIndex(root, label, namespace)
+    index = make_index(root, label, namespace)
     # Extract Information from source xml
     for variable in index.items():
         # Error Management
+        var_path = variable[0]
+        type_str = ''
         try:
-            vType = typeConversion[variable[1].find(label+':value_type', namespace).text]
+            type_str = variable[1].find(label + ':value_type', namespace).text
+            v_type = type_conversion[type_str]
         except KeyError:
-            sys.stderr.write(asciiformat.warning
-                             +asciiformat.bold(variable[1].find(label+':value_type', namespace).text)
-                             +' is not a recognized variable type.\n')
-            vType = None
+            sys.stderr.write('Value type "' +
+                             type_str +
+                             '" is not known!')
+            v_type = None
         except AttributeError:
-            sys.stderr.write(asciiformat.warning
-                             +'Variable '
-                             +asciiformat.bold(variable[0])
-                             +' seems to have no <value_type> field.\n')
-            vType = None        
+            sys.stderr.write('Attribute "value_type" not found in ' +
+                             AsciiFormat.bold(var_path))
+            v_type = None
         try:
-            vDirection = direction[variable[1].find(label+':direction', namespace).text]
+            var_direction = direction[variable[1].find(label + ':direction', namespace).text]
         except AttributeError:
-            sys.stderr.write(asciiformat.warning
-                             +'Variable '
-                             +asciiformat.bold(variable[0])
-                             +' seems to have no <direction> field.\n')
-            vDirection = None
+            sys.stderr.write('Attribute "direction" not found in ' +
+                             AsciiFormat.bold(var_path))
+            var_direction = None
         try:
-            vUnit = variable[1].find(label+':unit', namespace).text
+            var_unit = variable[1].find(label + ':unit', namespace).text
         except AttributeError:
-            sys.stderr.write(asciiformat.warning
-                             +'Variable '
-                             +asciiformat.bold(variable[0])
-                             +' seems to have no <unit> field.\n')
-            vUnit = ''
+            sys.stderr.write('Attribute "unit" not found in ' +
+                             AsciiFormat.bold(var_path))
+            var_unit = ''
         out.add({
-            'VariablePath':variable[0], 
-            'ValueType':vType, 
-            'Direction':vDirection,
-            'Unit':vUnit,
-            'Description':variable[1].find(label+':description', namespace).text,
-            'NumberOfElements':int(variable[1].find(label+':numberOfElements', namespace).text)})
+            'VariablePath': var_path,
+            'ValueType': v_type,
+            'Direction': var_direction,
+            'Unit': var_unit,
+            'Description': variable[1].find(label + ':description', namespace).text,
+            'NumberOfElements': int(variable[1].find(label + ':numberOfElements', namespace).text)})
     return out
 
-def findXDir(xmlRoot, nsPrefix, nsDict, xPath):
-    '''
-    Returns address of directory-node, described in xPath. 
-    '''
-    nodes = [xmlRoot]
-    for node in xPath.split('/'):
-        temp = nodes[-1].findall(nsPrefix + ":directory[@name='" + node + "']", nsDict)
+
+def find_x_dir(xml_root, ns_prefix, ns_dict, xpath):
+    """
+    Returns address of directory-node, described in xPath.
+    """
+    nodes = [xml_root]
+    for xml_node in xpath.split('/'):
+        temp = nodes[-1].findall(ns_prefix + ":directory[@name='" + xml_node + "']", ns_dict)
         if len(temp) == 0:
-            raise XmlNodeError(xPath, 'findXDir: "directory" node does not exist!')
+            raise XmlNodeError(xpath, 'findXDir: "directory" node does not exist!')
         elif len(temp) > 1:
-            sys.stderr.write(asciiformat.warning + 'Multiple directory-nodes named ' + node + ' found. First one will be used!\n')
+            sys.stderr.write(
+                AsciiFormat.warning +
+                'Multiple directory-nodes named ' +
+                xml_node +
+                ' found. First one will be used!\n')
         else:
             nodes.append(temp[0])
     return nodes[-1]
 
-def getMacro(node, nsPrefix, nsDict):
-    '''
-    Returns a struct holding length and placeholder as defined in the FIRST "macro" tag under the xml.etree Element, given in "node"
+
+def xml_tag_description(xml_node):
+    """Returns string describing content of node"""
+    node_type = xml_node.tag.split('}')[-1]
+    if node_type == 'outputfile':
+        output = AsciiFormat.bold('outputfile') + ' for ' + AsciiFormat.bold(node.get('path'))
+    elif node_type == 'recordgroup':
+        output = AsciiFormat.bold('recordgroup') + ' of type ' + AsciiFormat.bold(node.get('type'))
+    elif node_type == 'pv':
+        output = AsciiFormat.bold('pv') + ' named ' + AsciiFormat.bold(node.get('pvName'))
+    else:
+        output = AsciiFormat.bold('unknown')
+    return output
+
+
+def get_macro(xml_node, ns_prefix, ns_dict):
+    """
+    Returns a struct holding length and placeholder as defined in the FIRST "macro" tag
+    under the xml.etree Element, given in "node"
     "nsDict" is a dict holding "nsPrefix" and namespace(s) as key:value pairs.
-    '''
-    nodeType = node.tag.split('}')[-1]
-    if nodeType == 'outputfile':
-        whatami = asciiformat.bold('outputfile') + ' for ' + asciiformat.bold(node.get('path'))
-    elif nodeType == 'recordgroup':
-        whatami = asciiformat.bold('recordgroup') + ' of type ' + asciiformat.bold(node.get('type'))
-    elif nodeType == 'pv':
-        whatami = asciiformat.bold('pv') + ' named ' + asciiformat.bold(node.get('pvName'))
-    else:
-        whatami = asciiformat.bold('unknown')
-    output = struct()
-    output.node = node.find(nsPrefix + ':macro', nsDict)
-    if output.node == None:
+    """
+    output = Struct()  # type: Struct
+    output.node = xml_node.find(ns_prefix + ':macro', ns_dict)
+    whoami = xml_tag_description(xml_node)  # For error messages
+    if output.node is None:  # There is no 'macro' child in this xml element
         output.length = 0
-        output.placeholder = ""
+        output.placeholder = ''
     else:
-        tempLength = output.node.get('length')
-        tempPH = output.node.get('placeholder')
-        if tempLength == None:
-            sys.stderr.write(asciiformat.warning + 'The macro defined under element ' + whatami + ' holds no ' + asciiformat.bold('length') + ' parameter! (Typo?)\nThere will be no place reseved for this macro! Could result in overlong PV names!\n')
+        temp_length = output.node.get('length')
+        temp_ph = output.node.get('placeholder')
+        if temp_length is None:  # "macro"-child exists, but has no "length"-attribute
+            sys.stderr.write(AsciiFormat.error +
+                             'No "length" was defined for macro in' +
+                             whoami +
+                             '! PV name(s) will have no macro.\n')
             output.length = 0
+            output.placeholder = ''
         else:
-            output.length = int(tempLength)
-        if tempPH == None:
-            sys.stderr.write(asciiformat.warning + 'The macro defined under element ' + whatami + ' holds no ' + asciiformat.bold('placeholder') + ' parameter! (Typo?)\nThere will no place be reseved for this macro! Could result in unexpected PV names!\n')
+            output.length = int(temp_length)
+        if temp_ph is None:  # "macro"-child exists, but has no "placeholder"-attribute
+            sys.stderr.write(AsciiFormat.error +
+                             'No "placeholder" was defined for macro in' +
+                             whoami +
+                             '! PV name(s) will have no macro.\n')
             output.length = 0
-            output.placeholder = ""
-        else:
+            output.placeholder = ''
+        else:  # Everything is as expected
             output.placeholder = str(output.node.get('placeholder'))
     return output
 
-def getAutosave(node, nsPrefix, nsDict):
-    '''
+
+def get_autosave(xml_node, ns_prefix, ns_dict):
+    """
     Returns a boolean as defined in the FIRST "autosave" tag under the xml.etree Element, given in "node".
     "nsDict" is a dict holding "nsPrefix" and namespace(s) as key:value pairs.
-    '''
-    nodeType = node.tag.split('}')[-1]
-    if nodeType == 'outputfile':
-        whatami = asciiformat.bold('outputfile') + ' for ' + asciiformat.bold(node.get('path'))
-    elif nodeType == 'recordgroup':
-        whatami = asciiformat.bold('recordgroup') + ' of type ' + asciiformat.bold(node.get('type'))
-    elif nodeType == 'pv':
-        whatami = asciiformat.bold('pv') + ' named ' + asciiformat.bold(node.get('pvName'))
-    else:
-        whatami = asciiformat.bold('unknown')
-    output = struct()
-    output.node = node.find(nsPrefix + ':autosave', nsDict)
-    if output.node == None:
+    """
+    output = Struct()  # type: Struct
+    output.node = xml_node.find(ns_prefix + ':autosave', ns_dict)
+    whoami = xml_tag_description(xml_node)  # For error messages
+    if output.node is None:  # There is no 'autosave' child in this xml element
         output.active = None
-    elif output.node.get('isActive') == None:
-        sys.stderr.write(asciiformat.warning + 'Autosave defined under element ' + whatami + ' holds no ' + asciiformat.bold('isActive') + ' parameter! (Typo?)\nAutosave will be ignored!\n')
+    elif output.node.get('isActive') is None:  # autosave child exists, but has no "isActive"-attribute
+        sys.stderr.write(AsciiFormat.error +
+                         'No "isActive" was defined for autosave in' +
+                         whoami +
+                         '! PV will not be added to autosave.\n')
         output.active = None
-    elif output.node.get('isActive').lower() not in ['true', 'false']:
-        sys.stderr.write(asciiformat.warning + 'Autosave defined under element ' + whatami + ' holds no ' + asciiformat.bold('isActive') + ' parameter! (Typo?)\nAutosave will be ignored!\n')
+    elif output.node.get('isActive').lower() not in ['true', 'false']:  # "isActive"-attribute holds unrecognized value
+        sys.stderr.write(AsciiFormat.error +
+                         '"isActive", defined for autosave in' +
+                         whoami +
+                         ' has to be "true" or "false" (not case-sensitive), but is not! '
+                         'PV will not be added to autosave.\n')
         output.active = None
-    else:
-        output.active = {'true':True, 'false':False}[output.node.get('isActive').lower()]
+    else:  # Everything is as expected
+        output.active = {'true': True, 'false': False}[output.node.get('isActive').lower()]
     return output.active
 
-def getFields(node, nsPrefix, nsDict):
-    '''
-    Returns a dictionary holding all "field" tags type:value attributes under the xml.etree Element, given in "node" as key:value pairs.
-    "nsDict" is a dict holding "nsPrefix" and namespace(s) as key:value pairs.
-    '''
-    nodeType = node.tag.split('}')[-1]
-    if nodeType == 'outputfile':
-        whatami = asciiformat.bold('outputfile') + ' for ' + asciiformat.bold(node.get('path'))
-    elif nodeType == 'recordgroup':
-        whatami = asciiformat.bold('recordgroup') + ' of type ' + asciiformat.bold(node.get('type'))
-    elif nodeType == 'pv':
-        whatami = asciiformat.bold('pv') + ' named ' + asciiformat.bold(node.get('pvName'))
-    else:
-        whatami = asciiformat.bold('unknown')
+
+def get_fields(xml_node, ns_prefix, ns_dict):
+    """
+    Returns a dictionary holding all "field" tags type:value attributes under the xml.etree Element,
+     given in "xml_node" as key:value pairs.
+    "ns-dict" is a dict holding "ns-prefix" and namespace(s) as key:value pairs.
+    """
     output = dict()
-    fieldNodes = node.findall(nsPrefix + ':field', nsDict)
-    for field in fieldNodes:
-        fieldType = field.get('type')
-        fieldValue = field.get('value')
-        if fieldType == None or fieldValue == None:
-            sys.stderr.write(asciiformat.warning + 'Field defined under element ' + whatami + ' holds no ' + asciiformat.bold('type') + ' and/or ' + asciiformat.bold('value') + ' parameter! (Typo?)\nField will be ignored!\n')
+    field_nodes = xml_node.findall(ns_prefix + ':field', ns_dict)
+    whoami = xml_tag_description(xml_node)  # For error messages
+    for field in field_nodes:
+        field_type = field.get('type')
+        field_value = field.get('value')
+        if field_type is None:
+            if field_value is None:
+                sys.stderr.write(AsciiFormat.error +
+                                 'No "value" attribute was defined for a "field" child in' +
+                                 whoami +
+                                 '! "field" element will be ignored! \n')
+            sys.stderr.write(AsciiFormat.error +
+                             'No "type" attribute was defined for a "field" child in' +
+                             whoami +
+                             '! "field" element will be ignored! \n')
+        elif field_value is None:
+            sys.stderr.write(AsciiFormat.error +
+                             'No "value" attribute was defined for a "field" child in' +
+                             whoami +
+                             '! "field" element will be ignored! \n')
         else:
-            output[fieldType] = fieldValue # Fields of the same type overwrite!
+            output[field_type] = field_value  # Fields of the same type overwrite!
     return output
 
-CLAP=argparse.ArgumentParser(description='Generates EPICS PV database for every \'PV\' defined in ChimeraTK-xml file to EPICS database file.')
+
+CLAP = argparse.ArgumentParser(
+    description='Generates EPICS PV database for every \'PV\' defined in ChimeraTK-xml file to EPICS database file.')
 CLAP.add_argument('-c', help='Path to configuration file. Defaults to "mapConfig.xml"', metavar='path')
 CLAP.add_argument('-v', help='Activates verbosity', action='store_true')
 # Parse Command Line Arguments
-CLA=CLAP.parse_args()
+CLA = CLAP.parse_args()
 
-## Handle CLI arguments
+# Handle CLI arguments
 # Handle default case
-if CLA.c == None:
-    inifilePath = os.getcwd()
-    inifileName = 'mapConfig.xml'
+if CLA.c is None:
+    inifile_path = os.getcwd()
+    inifile_name = 'mapConfig.xml'
 else:
-    inifilePath, inifileName = os.path.split(os.path.abspath(CLA.c))
+    inifile_path, inifile_name = os.path.split(os.path.abspath(CLA.c))
     # Handle input of filename only
-    if inifilePath == None:
-        inifilePath = os.getcwd()
-# Handle invalid/nonexisting paths
-if not os.path.isdir(inifilePath):
-    sys.exit(asciiformat.error + 'Path ' + inifilePath + ' does not exist.')
-elif not os.path.isfile(os.path.join(inifilePath, inifileName)):
-    sys.exit(asciiformat.error + 'File ' + inifileName + ' does not exist.')
+    if inifile_path is None:
+        inifile_path = os.getcwd()
+# Handle invalid/non-existing paths
+if not os.path.isdir(inifile_path):
+    sys.exit(AsciiFormat.error + 'Path ' + inifile_path + ' does not exist.')
+elif not os.path.isfile(os.path.join(inifile_path, inifile_name)):
+    sys.exit(AsciiFormat.error + 'File ' + inifile_name + ' does not exist.')
 
-## Parse config file os.path.join(inifilePath, inifileName)
+# Parse config file os.path.join(inifilePath, inifileName)
 if CLA.v:
-    print("Reading: " + os.path.join(inifilePath, inifileName) + '\n')
-cfgTree = ET.parse(os.path.join(inifilePath, inifileName))
+    print("Reading: " + os.path.join(inifile_path, inifile_name) + '\n')
+cfgTree = xmlEleTree.parse(os.path.join(inifile_path, inifile_name))
 cfgRoot = cfgTree.getroot()
 
 # Define namespace
-configNS={'EPICSmap' : 'https://github.com/ChimeraTK/ControlSystemAdapter-EPICS-IOC-Adapter'}
+configNS = {'EPICSmap': 'https://github.com/ChimeraTK/ControlSystemAdapter-EPICS-IOC-Adapter'}
 # Get a list of all sourcefile entries
 sourcefiles = cfgRoot.findall("EPICSmap:sourcefile", configNS)
 
-# Check existance of sourcefile element(s)
+db = PVDb()
+db.add({'ID': 'SYS/PV1',
+        'pvName': 'PV-Name',
+        'autosave': False,
+        'doku': True,
+        'fields': {'FIELD1': 'Val1', 'FIELD2': 'Val2'}})
+db.add({'ID': 'SYS/PV2',
+        'pvName': 'PV-Name2',
+        'autosave': False,
+        'doku': True,
+        'fields': {'FIELD1': 'Val12', 'FIELD2': 'Val22'}})
+print(str(db))
+print(db['SYS/PV1'][4]['FIELD1'])
+
+# Check existence of sourcefile element(s)
 if len(sourcefiles) == 0:
-    sys.stderr.write(asciiformat.warning + 'No source files are defined!\n')
+    sys.stderr.write(AsciiFormat.warning + 'No source files are defined!\n')
 else:
     if CLA.v:
-        sourcelist=[]
+        sourcelist = []
         for i in sourcefiles:
             sourcelist.append(os.path.abspath(i.get("path")))
         print('Found ' + str(len(sourcefiles)) + ' sources:\n- ' + '\n- '.join(sourcelist) + '\n')
@@ -442,52 +528,65 @@ else:
     for sfile in sourcefiles:
         # Check if sourcefile exists
         if not os.path.isfile(sfile.get("path")):
-            sys.stderr.write(asciiformat.warning + "File \'" + os.path.abspath(sfile.get("path")) + "\' does not exist!\n")
+            sys.stderr.write(
+                AsciiFormat.warning +
+                "File \'" +
+                os.path.abspath(sfile.get("path")) +
+                "\' does not exist!\n")
         # Parse source file according to type
         sourceTag = sfile.get("label")
         if sfile.get("type") == "xml-variables":
-            source[sourceTag] = processXmlVariable(sfile)
-            #parse aliases
+            source[sourceTag] = process_xml_variable(sfile)
+            # parse aliases
             for item in sfile.findall('EPICSmap:alias', configNS):
-                alias[sourceTag + '.' + item.get('varLabel')]=item.get('xmlPath')
+                alias[sourceTag + '.' + item.get('varLabel')] = item.get('xmlPath')
         else:
-            sys.stderr.write(asciiformat.warning + 'Source file type '+sfile.get("type")+' is unknown. Source file '+sfile.get("path")+' labeled '+sfile.get("label")+' will be ignored!\n')
+            sys.stderr.write(
+                AsciiFormat.warning +
+                'Source file type ' +
+                sfile.get("type") +
+                ' is unknown. Source file ' +
+                sfile.get("path") +
+                ' labeled ' +
+                sfile.get("label") +
+                ' will be ignored!\n')
 
 # Get a list of all outputfile entries
 outputFiles = cfgRoot.findall("EPICSmap:outputfile", configNS)
-outputList=table(['type', 'path', 'handle'])
+outputList = Table(['type', 'path', 'handle'])
 for i in outputFiles:
-    outputFile = {'path' : os.path.abspath(i.get('path')), 'type' : i.get('type'), 'handle' : i}
+    outputFile = {'path': os.path.abspath(i.get('path')), 'type': i.get('type'), 'handle': i}
     outputList.add(outputFile)
 if CLA.v:
     print(str(len(outputList)) + ' output files are defined:\n' + str(outputList) + '\n')
 
 for outFile in outputList:
-    macro_rgroup = struct()
+    macro_rgroup = Struct()
     macro_rgroup.length = 0
     macro_rgroup.placeholder = ""
     autosave_rgroup = None
     fields_rgroup = dict()
     if outFile['type'] == 'db':
-        node=outFile['handle']
+        node = outFile['handle']
         # process attributes for the whole file
-        macro_file = getMacro(node, 'EPICSmap', configNS)
-        autosave_file = {None:False, False:False, True:True}[getAutosave(node, 'EPICSmap', configNS)]
-        fields_file = getFields(node, 'EPICSmap', configNS)
-        ## process recordgroups
+        macro_file = get_macro(node, 'EPICSmap', configNS)
+        autosave_file = {None: False, False: False, True: True}[get_autosave(node, 'EPICSmap', configNS)]
+        fields_file = get_fields(node, 'EPICSmap', configNS)
+        # process recordgroups
         rgroupList = node.findall('EPICSmap' + ':recordgroup', configNS)
         for rgroupNode in rgroupList:
-            macro_temp = getMacro(rgroupNode, 'EPICSmap', configNS)
-            if macro_temp.node != None:
+            macro_temp = get_macro(rgroupNode, 'EPICSmap', configNS)
+            if macro_temp.node is not None:
                 macro_rgroup = macro_temp
             else:
                 macro_rgroup = macro_file
-            autosave_temp = getAutosave(rgroupNode, 'EPICSmap', configNS)
-            if autosave_temp != None:
+            autosave_temp = get_autosave(rgroupNode, 'EPICSmap', configNS)
+            if autosave_temp is not None:
                 autosave_rgroup = autosave_temp
             else:
                 autosave_rgroup = autosave_file
             fields_rgroup = fields_file
-            fields_rgroup.update(getFields(rgroupNode, 'EPICSmap', configNS))
-            
-        print(str(macro_rgroup.length) + '\t' + macro_rgroup.placeholder + '\n' + str(autosave_rgroup) + '\n' + str(fields_rgroup))
+            fields_rgroup.update(get_fields(rgroupNode, 'EPICSmap', configNS))
+
+        print(str(macro_rgroup.length) + '\t' + macro_rgroup.placeholder + '\n' + str(autosave_rgroup) + '\n' + str(
+            fields_rgroup))
