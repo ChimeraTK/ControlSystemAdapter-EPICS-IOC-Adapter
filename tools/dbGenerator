@@ -8,9 +8,10 @@ Written and tested for Python 3.5.2 @ June 2019 by Patrick Nonn for DESY/MSK
 
 import argparse  # Parse command line arguments
 import os  # For file manipulation
-import sys
+import sys  # To access stdout and stdin
 import xml.etree.ElementTree as xmlEleTree  # xml parser
-from typing import List, Any
+from typing import List, Dict, Any, Union  # Type hints
+from datetime import datetime  # To access system time
 
 VERSION = '0.1'
 
@@ -37,7 +38,7 @@ class AsciiFormat:
         return '\033[1m' + text + '\033[0m'
 
 
-# Define Exception
+# Define Exceptions
 class XmlNodeError(Exception):
     """Exception raised, if xml-node invalid"""
 
@@ -46,12 +47,119 @@ class XmlNodeError(Exception):
         self.Message = message
 
 
+class SkipLoop(Exception):
+    """Exception raised, to skip a loop outside of the actual one"""
+
+    def __init__(self, message):
+        self.message = message
+
+
+# End of Exception definitions
+
+
+class Logging:
+    """
+    Class to handle logging
+    depends on: os, sys, AsciiFormat
+    """
+
+    def __init__(self, logfile_path: str):
+        """
+        Constructor of class Logging.
+        :param logfile_path: String holding filename of path to file to write log into.
+        """
+        if logfile_path is None or logfile_path == '' or os.path.isdir(logfile_path):  # Check plausability
+            raise AttributeError('Class "Logging" initiated without defining path to logfile!')
+        if not isinstance(logfile_path, str):  # Check Type
+            raise TypeError('Class "Logging" was initiated with something different than a string!')
+        if not os.path.isfile(logfile_path):  # Check, if file exists
+            logfile_path_dir, logfile_path_filename = os.path.split(logfile_path)
+            if logfile_path_dir == '':  # Check, if logfile_path is only filename
+                self.logfile_path = os.path.abspath(logfile_path_filename)
+            elif os.path.isdir(logfile_path_dir):  # Check, if directory, defined in logfile path, exists
+                self.logfile_path = os.path.abspath(logfile_path)
+            elif not os.path.isdir(logfile_path_dir):
+                # If directory for logfile does not exist or is not accessible, use current working directory
+                self.logfile_path = os.path.abspath(logfile_path_filename)
+                sys.stderr.write('\033[1m\033[93mWarning:\033[0m: Directory defined for logfile is not accessible! '
+                                 'Logfile will be generated in the current working directory.\n')
+            else:
+                raise AttributeError('Unrecognized Error, while processing Argument "logfile_path", '
+                                     'passed to class "Logging"')
+        else:  # logfile_path points to existing file
+            self.logfile_path = os.path.abspath(logfile_path)
+        with open(self.logfile_path, 'a') as f:
+            f.write('--------------\n' +
+                    str(datetime.now()) +
+                    ': Beginning run of dbGenerator\n')
+
+    def _markdown(self, in_str: str) -> str:
+        """
+        Recursive method to change strings containing ascii formatting for stdout to plain ascii.
+        :param in_str: String to be changed
+        :return: String without ascii formatting
+        """
+        if not isinstance(in_str, str):
+            raise TypeError('_markdown takes only string type attributes')
+        mark_left = '\033[1m'
+        mark_left_len = len(mark_left)
+        mark_right = '\033[0m'
+        pos_open = in_str.find(mark_left)
+        if pos_open != -1:
+            if in_str.find('\33[9', pos_open + mark_left_len, pos_open + mark_left_len + 3) != -1:
+                mark_left_len += len('\33[93m')
+            pos_close = in_str.find(mark_right, pos_open + mark_left_len)
+            if pos_close != -1:
+                return self._markdown(in_str[:pos_open] +
+                                      in_str[pos_open + mark_left_len:pos_close].upper() +
+                                      in_str[pos_close + len(mark_right):])
+            else:
+                return in_str
+        else:
+            return in_str
+
+    def write(self, log_message: str):
+        """
+        Method to write to log file and stderr
+        :param log_message: String holding message to be written, formatted for stderr
+        """
+        if not isinstance(log_message, str):
+            raise TypeError('Log takes only string type attributes')
+        if log_message.find(AsciiFormat.warning) != -1:  # Check, if string contains warning tag
+            sys.stderr.write(log_message + '\n')
+            with open(self.logfile_path, 'a') as f:
+                f.write(str(datetime.now()) +
+                        ': ' +
+                        self._markdown(log_message) +
+                        '\n')
+        elif log_message.find(AsciiFormat.error) != -1:  # Check, if string contains error tag
+            sys.stderr.write(log_message + '\n')
+            with open(self.logfile_path, 'a') as f:
+                f.write(str(datetime.now()) +
+                        ': ' +
+                        self._markdown(log_message) +
+                        '\n')
+        else:  # When no tag is found
+            sys.stdout.write(log_message + '\n')
+            with open(self.logfile_path, 'a') as f:
+                f.write(str(datetime.now()) +
+                        ': ' +
+                        self._markdown(log_message) +
+                        '\n')
+
+
 class Table:
     """Container class for structured data in table format. Data added in rows, but can be accessed by column name."""
 
-    # Constructor
-    def __init__(self, column_names, content_list=None):
-        if not isinstance(column_names, (list, str)):  # Check for right attribute type
+    def __init__(self,
+                 column_names: Union[str, List[str]],
+                 content_list: Union[List[List[str]], List[Dict[str, Any]], None] = None):
+        """
+        Constructor of Table object
+        :param column_names: List of strings, naming the columns of the table.
+        :param content_list: List of either lists or dicts of the same length as column_names, filling the table.
+        """
+        if not isinstance(column_names, (list, str)):  # Check type
             raise TypeError('The first attribute of table() has to be of type list or string!')
         if isinstance(column_names, str):  # Conversion to list type if it is string
             column_names = [column_names]
@@ -60,7 +168,7 @@ class Table:
         elif len(column_names) != len(set(column_names)):  # Check for duplicates
             raise AttributeError('The first attribute of table() can\'t contain duplicates!')
         else:
-            self._head = column_names
+            self._head = column_names  # type: List[str]
         if content_list is not None:  # Process content given at initialization
             if not all(map(lambda x: isinstance(x, (list, dict)), content_list)):  # Check types
                 raise TypeError('The second attribute of table() has to be None or a list of lists or dictionaries!')
@@ -71,31 +179,47 @@ class Table:
                 for row in content_list:
                     # Check, if row has the required length
                     if len(row) != len(self._head):
-                        sys.stderr.write('At least one list has not the right length!')
+                        raise AttributeError('At least one element of "content_list" has the wrong length!')
                     else:
                         # Convert list of uniform lists to list of uniform dictionaries
                         self.add(dict(zip(self._head, row)))
-            elif all(map(lambda x: isinstance(x, list), content_list)):  # Process list of lists
-                self._table = content_list
+            elif all(map(lambda x: isinstance(x, dict), content_list)):  # Process list of dictionaries
+                self._table = []
+                for row_dict in content_list:  # type: Dict[str, Any]
+                    self.add(row_dict)
             else:  # Something is very wrong, if we get here
-                raise AttributeError('The second attribute, if not None, has to be a list of ONLY lists or a list of '
-                                     'ONLY dictionaries!')
+                raise AttributeError('The attribute "content_list", if not None, has to be '
+                                     'a list of ONLY lists or '
+                                     'a list of ONLY dictionaries!')
         else:
             self._table = []
 
-    # Representation of table object
     def __repr__(self):
+        """
+        Magic method, called when Table object is printed
+        :return: String describing object
+        """
         return 'Table object with ' + str(len(self._table)) + ' entries.'
 
-    # Printed output of table object
     def __str__(self):
+        """
+        Magic method, called by str()
+        :return: String, displaying the content of Table object
+        """
         output = ['\033[1m' + str(self._head) + '\033[0m']
         for table_row in self._table:
-            output.append(list(table_row.values()))
+            row_list = []
+            for col_name in self._head:
+                row_list.append(table_row[col_name])
+            output.append(str(row_list))
         return '\n'.join(output)
 
-    # Magic method for "object['columnName']" accessor. Returns list of named columns content.
-    def __getitem__(self, col):
+    def __getitem__(self, col: str) -> List[Any]:
+        """
+        Magic method, called by []-accessor
+        :param col: String holding column name, has to be in "_head".
+        :return: List, holding content of column "col".
+        """
         if col in self._head:
             output = []  # type: List[Any]
             for table_row in self._table:
@@ -104,8 +228,11 @@ class Table:
         else:
             raise AttributeError('table has no column named "' + str(col) + '"')
 
-    # Magic method for len()-function, returns number of "rows"
-    def __len__(self):
+    def __len__(self) -> int:
+        """
+        Magic method, called by len()
+        :return: Integer, representing number of rows in table
+        """
         return len(self._table)
 
     # Magic method to initialize iterator.
@@ -126,23 +253,45 @@ class Table:
             self._index = self._index + 1
             return output
 
-    # Method to add "row".
-    def add(self, row):
+    def add(self, row: Dict[str, Any]):
+        """
+        Method to add row to Table object.
+        :param row: Dictionary with the keys defined in _head. May have content beyond the needed keys.
+        """
         if not isinstance(row, dict):  # Check Type
             raise TypeError('table.add() expects a dictionary as argument')
         if len(row) < len(self._head):  # Check length
             raise ValueError('The argument of add_row has to be a dictionary with the length of at least '
                              + str(len(self._head)))
-        if any(map(lambda col:
-                   all(map(lambda key:
-                           col != key, list(row.keys()))),
-                   self._head)):  # Check keys
-            raise AttributeError('The dictionary given to table.add() misses at least one key, defined in the first '
-                                 'attribute of table()!')
-        self._table.append(row)
+        new_row = {}
+        for col in self._head:  # Add only keys defined in head to the table
+            try:
+                new_row[col] = row[col]
+            except KeyError:  # If row misses a key
+                raise AttributeError('The dictionary given to table.add() misses at least one key, '
+                                     'defined in the first attribute of table()!')
+        self._table.append(new_row)
 
-    # Method to search for "row(s)" containing defined pattern, which can be a dict or a string.
-    def query(self, pattern):
+    def remove_column(self, col_name: str):
+        """
+        Method to remove column
+        :param col_name: Name of the column to be removed
+        """
+        if not isinstance(col_name, str):
+            raise TypeError('Attribute "col_name" of method "remove_column" has to be of type string.')
+        if col_name not in self._head:
+            raise AttributeError('Attribute "col_name" of method "remove_column" is not a column in Table object.')
+        self._head.remove(col_name)
+        for entry in self._table:
+            entry.pop(col_name, None)
+
+    def query(self, pattern: Union[Dict[str, Any], str]) -> Union[List[Dict[str, Any]], None]:
+        """
+        Method to search the table for either all rows with a field matching pattern string or all rows where the
+        content of column, defined in pattern dictionary, matches the value, associated in dictionary.
+        :param pattern: String or dictionary, defining the search pattern
+        :return: List of dictionaries, holding the result of the query, or None, if nothing was found
+        """
         result = []
         if not isinstance(pattern, (dict, str)):
             raise TypeError('table.query() takes a dict or a string as argument!')
@@ -151,56 +300,66 @@ class Table:
             for pattern_key in pattern:
                 if pattern_key in self._head:
                     result = list(filter(lambda x: x[pattern_key] == pattern[pattern_key], result))
+                else:
+                    raise ValueError(pattern_key + ' is not a column in table!')
         elif isinstance(pattern, str):
             for head_key in self._head:
                 result += list(filter(lambda x: x[head_key] == pattern, self._table))
-        return result
+        if not result:
+            return None
+        else:
+            return result
 
 
 class PVDb(Table):
-    """Main container for data from all sources"""
+    """Main container for data from all sources, child of class table"""
 
-    def __init__(self):
-        super().__init__(['ID', 'pvName', 'autosave', 'doku', 'fields'], None)
-        self._aliases = {}
+    def __init__(self, logging: Any = sys.stderr):
+        """
+        :param logging: Object with 'write()' method, i.e. Logger or sys.stderr
+        """
+        super().__init__(['devicePath', 'pvName', 'recordType', 'autosave', 'doku', 'fields'], None)
+        self.aliases = {}
+        if not callable(getattr(logging, 'write')):
+            raise AttributeError('Attribute "logging" of PVDb object has to be an object with a "write" method!')
+        else:
+            self.log = logging
 
-    # Magic method for "object['columnName']" accessor. Returns list of named columns content.
-    def __getitem__(self, pv_id):
+    def __getitem__(self, pv_id: str) -> dict:
+        """
+        Magic method to access dataset (row) with the field 'devicePath' matching pv_id
+        :param pv_id: String to search for in field 'devicePath'
+        :return: Dictionary holding the whole dataset
+        """
         if not isinstance(pv_id, str):  # Check Type
             raise TypeError('Attribute of PVDb[] has to be string.')
-        query_result = super().query({'ID': pv_id})  # Find Entry
+        query_result = super().query({'devicePath': pv_id})  # Find Entry
         if len(query_result) == 0:  # Check existence
-            sys.stderr.write('PV with ID ' +
-                             pv_id +
-                             ' does not exist in PVDb')
+            self.log.write(AsciiFormat.error +
+                           'PV with device path ' +
+                           pv_id +
+                           ' does not exist in PVDb')
         elif len(query_result) == 1:  # Usual case
             index = self._table.index(query_result[0])
             return self._table[index]
         elif len(query_result) >= 1:  # Check Multiple Entries
-            sys.stderr.write('Multipe PVs with ID ' +
-                             pv_id +
-                             ' found in PVDb! PVDb might be corrupted!')
+            self.log.write(AsciiFormat.error +
+                           'Multiple PVs with device path ' +
+                           pv_id +
+                           ' found in PVDb! PVDb might be corrupted!')
         else:  # For unforeseen cases
             raise RuntimeError('Something has gone wrong!')
 
-    # Method to add rows to database
-    def add(self, row):
-        if not isinstance(row, dict):  # Check Type
-            raise TypeError('PVDb.add() expects a dictionary as argument')
-        if len(row) < len(self._head):  # Check Length
-            raise ValueError('The argument of add_row has to be a dictionary with the length of at least '
-                             + str(len(self._head)))
-        if any(map(lambda col:
-                   all(map(lambda key:
-                           col != key, list(row.keys()))),
-                   self._head)):  # Check Keys
-            raise AttributeError('The attribute of PVDb.add() misses at least one of the following keys:\n' +
-                                 str(self._head))
-        super().add(row)
-
     def _expand(self, in_str):
-        if isinstance(in_str, str):
-            pos_open = in_str.find("{")
+        """
+        Recursive method to replace strings, placed between "*{" and "}"
+        :param in_str: String to be expanded
+        :return: Expanded string
+        """
+        if not isinstance(in_str, str):
+            raise TypeError('Attribute "in_str" of "_expand"-method has to be of type string')
+        else:
+            pos_open = in_str.find("*{")
             if pos_open != -1:
                 pos_close = in_str.find("}", pos_open + 1)
                 if pos_close == -1:
@@ -209,23 +368,379 @@ class PVDb(Table):
                 return in_str
             try:
                 if pos_close - pos_open > 1:  # Check for empty curly brackets
-                    macro = self._aliases[in_str[pos_open + 1:pos_close]]
+                    macro = self.aliases[in_str[pos_open + 2:pos_close]]
                 else:
-                    sys.stderr.write(AsciiFormat.warning +
-                                     'Empty Macro in string "' +
-                                     in_str +
-                                     '" will be ignored!\n')
+                    self.log.write(AsciiFormat.warning +
+                                   'Empty Macro in string "' +
+                                   in_str +
+                                   '" will be ignored!')
                     macro = ''
             except KeyError:
-                sys.stderr.write(AsciiFormat.warning +
-                                 'Macro ' +
-                                 in_str[pos_open:pos_close + 1] +
-                                 ' not defined, and will be ignored!\n')
+                self.log.write(AsciiFormat.warning +
+                               'Macro ' +
+                               in_str[pos_open:pos_close + 1] +
+                               ' not defined, and will be ignored!')
                 macro = ''
             out = self._expand(in_str[:pos_open] + macro + in_str[pos_close + 1:])
-        else:
-            raise TypeError('The _expand method of ' + self.__name__)
         return out
+
+    def add_aliases(self, alias_dict: dict):
+        """
+        Method to add aliases to the objects alias dictionary. If key already exists, it is overwritten.
+        :param alias_dict: Dictionary holding the aliases to be added.
+        """
+        if isinstance(alias_dict, dict):
+            self.aliases.update(alias_dict)
+        else:
+            raise TypeError('Argument of add_alias method has to be a dictionary!')
+
+    def recordtypes(self) -> List[str]:
+        """
+        Method to get a list of all different record types, present in database.
+        :return: List with record types
+        """
+        return list(set(super().__getitem__('recordType')))  # list(set(list)) construct to eliminate duplicates
+
+    def records_of_type(self, record_type: str) -> Table:
+        """
+        Method to extract sub Table with PVs of same record type
+        :param record_type: Record type to extract
+        :return: Table holding only records of given record type
+        """
+        out_content = self.query({'recordType': record_type})
+        return Table(['devicePath', 'pvName', 'autosave', 'doku', 'fields'], content_list=out_content)
+
+
+class XmlSource(Table):
+    """
+    Class to handle data from xml files, generated with <ChimeraTK-server>-xmlGenerator.
+    """
+
+    def __init__(self, xml_filepath: str, namespace: str, aliases: Dict[str, str], logger: Any = sys.stderr):
+        """
+        Constructor of XmlSource object
+        :param xml_filepath: Filename or path to xml file to be parsed
+        :param namespace: Namespace used in xml file
+        :param aliases: Dictionary with aliases to replace xml paths
+        :param logger: Object with "write" method, i.e. sys.stderr or Logging-class object
+        """
+        if not os.path.isfile(xml_filepath):
+            raise AttributeError(str(xml_filepath) + ' is not an existing file!')
+        if not callable(getattr(logger, 'write')):
+            raise AttributeError('Attribute "logger" of class XmlSource has to have a callable method "write(str)"')
+        self.logger = logger
+        super().__init__(['Alias',
+                          'VariablePath',
+                          'VariableName',
+                          'value_type',
+                          'numberOfElements',
+                          'direction',
+                          'unit',
+                          'description'])
+        # Indexing "variables" in xml file
+        if isinstance(namespace, str):
+            self._ns_dict = {'namespace_prefix': namespace}
+        else:
+            raise TypeError('The attribute "namespace" of class XmlSource has to be a string!')
+        self._index = []
+        self._file = os.path.abspath(xml_filepath)
+        self._tree = xmlEleTree.parse(self._file)
+        self._root = self._tree.getroot()
+        self._application = self._root.get('name')
+        self._make_index(self._root)
+        # Extract Information from source xml
+        for variable in self._index:
+            var_path = variable['var_path']
+            var_name = variable['var_name']
+            var_data = {'value_type': None,
+                        'unit': '',
+                        'description': '',
+                        'direction': None,
+                        'numberOfElements': None}
+            try:  # To catch SkipLoop
+                for val_key in var_data:
+                    try:
+                        var_data[val_key] = variable['xml_address'].find('namespace_prefix:' +
+                                                                         val_key, self._ns_dict).text
+                    except AttributeError:
+                        self.logger.write(AsciiFormat.error +
+                                          'Attribute "value_type" not found in ' +
+                                          AsciiFormat.bold(var_path + var_name) +
+                                          '!')
+                        if val_key in ['direction', 'numberOfElements']:
+                            raise SkipLoop
+            except SkipLoop:
+                self.logger.write('Variable will be ignored')
+                continue
+
+            try:
+                var_alias = aliases[var_path]
+            except KeyError:
+                self.logger.write('No alias found for ' + str(var_path) + '! Using full xml path instead!')
+                var_alias = var_path[:-1]  # Cut the last slash
+            # Assembling content
+            self.__add({
+                'Alias': var_alias + '/' + var_name,
+                'VariablePath': var_path,
+                'VariableName': var_name,
+                'value_type': var_data['value_type'],
+                'direction': var_data['direction'],
+                'unit': var_data['unit'],
+                'description': var_data['description'],
+                'numberOfElements': int(var_data['numberOfElements'])
+            })
+
+    # Magic method for "object[string]" accessor. Returns the row with Alias = string.
+    def __getitem__(self, search_str: str) -> Dict[str, Any]:
+        """
+        Magic method for []-accessor.
+        :param search_str: String to be found in 'Alias'-column
+        :return: Dictionary of the entry, whose 'Alias' column in matching 'search_str'
+        """
+        if not isinstance(search_str, str):  # Check Type
+            raise TypeError('Attribute of XmlSource[] has to be string.')
+        query_result = super().query({'Alias': search_str})  # Find Entry
+        if len(query_result) == 0:  # Check existence
+            self.logger.write(AsciiFormat.error +
+                              'Entry with Alias ' +
+                              search_str +
+                              ' does not exist in XmlSource')
+        elif len(query_result) == 1:  # Usual case
+            index = self._table.index(query_result[0])
+            return self._table[index]
+        elif len(query_result) >= 1:  # Check Multiple Entries
+            self.logger.write(AsciiFormat.error +
+                              'Multiple PVs with ID ' +
+                              search_str +
+                              ' found in PVDb! PVDb might be corrupted!')
+        else:  # For unforeseen cases
+            raise RuntimeError('Something has gone wrong!')
+
+    def _make_index(self, xml_node: Any, pv_path: str = ''):
+        """
+        Recursive method to iterate through the xml tree and isolate the 'variables'
+        while maintaining the path in order to generate an index.
+        Takes:
+        :param xml_node: xml handle to start the recursion
+        :param pv_path: Path to the node, from which the function is called.
+        """
+        for v in xml_node.findall('namespace_prefix' + ':variable', self._ns_dict):
+            self._index.append({'xml_address': v, 'var_path': pv_path, 'var_name': v.get('name')})
+        for d in xml_node.findall('namespace_prefix' + ':directory', self._ns_dict):
+            self._make_index(d, pv_path=pv_path + d.get('name') + '/')
+        return  # Break recursion, if no more directories found
+
+    def __add(self, row: Dict[str, Any]):  # To bend add method of parent class to hidden method
+        super().add(row)
+
+    def add(self, row):  # To hide add method of parent class
+        raise AttributeError("'XmlSource' object has no attribute 'add'")
+
+    def make_aliases(self):
+        """
+        Returns dictionary with aliases, generated from the xmlPath by extracting the seperator '/' and, after
+        abbreviating the individual elements, setting the result in camel case:
+        XML/Path/element/1/ -> XmlPathElem1
+        :return: Dictionary with full xml paths as keys and aliases as values
+        TODO: Make it possible to import abbreviations
+        """
+        abbr = {
+            'filesystem': 'fs',
+            'processes': 'procs',
+            'configuration': 'cfg',
+            'statistics': 'stats',
+            'watchdog': 'wd'
+        }
+        out = {}
+        for path in list(set(super().__getitem__('VariablePath'))):  # list(set(list)) to remove duplicates
+            words = path.split('/')
+            alias_string = ''
+            for word in words:
+                if word in abbr:  # Look up, if path element can be abbreviated
+                    alias_string += abbr[word.casefold()].capitalize()
+                else:
+                    alias_string += word.casefold().capitalize()
+            out[path] = alias_string
+        return out
+
+    def generate_config_file(self, cfg_path, macro=''):
+        """
+        Method to generate simple config xml file as a blank.
+        :param cfg_path: Path to write config xml file to
+        :param macro: Macro to be added to all PVs
+        """
+        if not isinstance(cfg_path, str):
+            raise TypeError('Argument "cfg_path" has to be a string, preferably holding the path to a file!')
+        if not isinstance(macro, str):
+            raise TypeError('Argument "macro" has to be a string!')
+        cfg_abspath = os.path.abspath(cfg_path)
+        cfg_dir, cfg_file = os.path.split(cfg_abspath)
+        if not os.path.isdir(cfg_dir):
+            raise AttributeError(cfg_dir + ' is not a valid path to an existing directory!')
+        # Prompt if existing file should be overwritten, and end function, if not
+        if os.path.isfile(cfg_abspath) and not \
+                input('File ' + cfg_path + ' exists! Overwrite? (y/n):').lower() in ['y', 'yes']:
+            self.logger.write('Ending config file generation to not overwrite existing file!')
+            return
+        # Dictionary to convert c types into EPICS counterparts
+        pv_type_conversion = {'int64': 'INT64',
+                              'uint64': 'UINT64',
+                              'int32': 'LONG',
+                              'uint32': 'ULONG',
+                              'int16': 'SHORT',
+                              'uint16': 'USHORT',
+                              'int8': 'CHAR',
+                              'uint8': 'UCHAR',
+                              'double': 'DOUBLE',
+                              'float': 'FLOAT',
+                              'string': 'STRING'}
+        # Dictionary to convert "direction" to EPICS IN/OUT
+        pv_direction_determination = {'control_system_to_application': 'OUT',
+                                      'control_system_to_application_with_return': 'OUT',
+                                      'application_to_control_system': 'INP',
+                                      'application_to_control_system_with_return': 'INP'}
+        pv_type_determination = {'INPFalseINT64': 'int64in',
+                                 'INPFalseUINT64': 'int64in',
+                                 'INPFalseFLOAT': 'ai',
+                                 'INPFalseDOUBLE': 'ai',
+                                 'INPFalseSHORT': 'longin',
+                                 'INPFalseUSHORT': 'longin',
+                                 'INPFalseLONG': 'longin',
+                                 'INPFalseULONG': 'longin',
+                                 'INPFalseCHAR': 'longin',
+                                 'INPFalseUCHAR': 'longin',
+                                 'INPFalseSTRING': 'lsi',
+                                 'INPTrueINT64': 'aai',
+                                 'INPTrueUINT64': 'aai',
+                                 'INPTrueFLOAT': 'aai',
+                                 'INPTrueDOUBLE': 'aai',
+                                 'INPTrueSHORT': 'aai',
+                                 'INPTrueUSHORT': 'aai',
+                                 'INPTrueLONG': 'aai',
+                                 'INPTrueULONG': 'aai',
+                                 'INPTrueCHAR': 'aai',
+                                 'INPTrueUCHAR': 'aai',
+                                 'INPTrueSTRING': 'aai',
+                                 'OUTFalseINT64': 'int64out',
+                                 'OUTFalseUINT64': 'int64out',
+                                 'OUTFalseFLOAT': 'ao',
+                                 'OUTFalseDOUBLE': 'ao',
+                                 'OUTFalseSHORT': 'longout',
+                                 'OUTFalseUSHORT': 'longout',
+                                 'OUTFalseLONG': 'longout',
+                                 'OUTFalseULONG': 'longout',
+                                 'OUTFalseCHAR': 'longout',
+                                 'OUTFalseUCHAR': 'longout',
+                                 'OUTFalseSTRING': 'lso',
+                                 'OUTTrueINT64': 'aao',
+                                 'OUTTrueUINT64': 'aao',
+                                 'OUTTrueFLOAT': 'aao',
+                                 'OUTTrueDOUBLE': 'aao',
+                                 'OUTTrueSHORT': 'aao',
+                                 'OUTTrueUSHORT': 'aao',
+                                 'OUTTrueLONG': 'aao',
+                                 'OUTTrueULONG': 'aao',
+                                 'OUTTrueCHAR': 'aao',
+                                 'OUTTrueUCHAR': 'aao',
+                                 'OUTTrueSTRING': 'aao'}
+        pv_autosave_determination = {'int64out': True,
+                                     'int64in': False,
+                                     'ao': True,
+                                     'ai': False,
+                                     'longout': True,
+                                     'longin': False,
+                                     'aao': False,
+                                     'aai': False,
+                                     'lso': True,
+                                     'lsi': False}
+        pv_scan_determination = {'INP': 'Passive',
+                                 'OUT': '.5 seconds'}
+        pvs = PVDb(self.logger)
+        pvs.add_aliases(self.make_aliases())
+        for entry in self._table:  # Build database
+            pv_dir = pv_direction_determination[entry['direction']]
+            pv_type = pv_type_conversion[entry['value_type']]
+            pv_noe = entry['numberOfElements']
+            pv_recordtype = pv_type_determination[pv_dir + str(pv_noe > 1) + pv_type]
+            pv_autosave = pv_autosave_determination[pv_recordtype]
+            pv_fields_determination = {'int64out': {'SCAN': pv_scan_determination[pv_dir],
+                                                    pv_dir: '@$(APP) ' + entry['Alias'],
+                                                    'EGU': ':unit'},
+                                       'int64in': {'SCAN': pv_scan_determination[pv_dir],
+                                                   pv_dir: '@$(APP) ' + entry['Alias'],
+                                                   'EGU': ':unit'},
+                                       'ao': {'SCAN': pv_scan_determination[pv_dir],
+                                              pv_dir: '@$(APP) ' + entry['Alias'],
+                                              'EGU': ':unit'},
+                                       'ai': {'SCAN': pv_scan_determination[pv_dir],
+                                              pv_dir: '@$(APP) ' + entry['Alias'],
+                                              'EGU': ':unit'},
+                                       'longout': {'SCAN': pv_scan_determination[pv_dir],
+                                                   pv_dir: '@$(APP) ' + entry['Alias'],
+                                                   'EGU': ':unit'},
+                                       'longin': {'SCAN': pv_scan_determination[pv_dir],
+                                                  pv_dir: '@$(APP) ' + entry['Alias'],
+                                                  'EGU': ':unit'},
+                                       'lso': {'SCAN': pv_scan_determination[pv_dir],
+                                               pv_dir: '@$(APP) ' + entry['Alias']},
+                                       'lsi': {'SCAN': pv_scan_determination[pv_dir],
+                                               pv_dir: '@$(APP) ' + entry['Alias']},
+                                       'aao': {'SCAN': pv_scan_determination[pv_dir],
+                                               pv_dir: '@$(APP) ' + entry['Alias'],
+                                               'EGU': ':unit',
+                                               'FTVL': ':value_type',
+                                               'NELM': ':numberOfElements'},
+                                       'aai': {'SCAN': pv_scan_determination[pv_dir],
+                                               pv_dir: '@$(APP) ' + entry['Alias'],
+                                               'EGU': ':unit',
+                                               'FTVL': ':value_type',
+                                               'NELM': ':numberOfElements'}}
+            pvs.add({'devicePath': '*{' + entry['Alias'] + '}',
+                     'pvName': '${' + macro + '}' + entry['Alias'],
+                     'recordType': pv_recordtype,
+                     'autosave': pv_autosave,
+                     'doku': True,
+                     'fields': pv_fields_determination[pv_recordtype]})
+        cfg_xmlns = 'https://github.com/ChimeraTK/ControlSystemAdapter-EPICS-IOC-Adapter'
+        cfg_xml_root = xmlEleTree.Element('EPICSdb', xmlns=cfg_xmlns, application=self._application)
+        cfg_xml_source = xmlEleTree.SubElement(cfg_xml_root, 'sourcefile',
+                                               type='xml-variables',
+                                               path=self._file,
+                                               namespace=self._ns_dict['namespace_prefix'],
+                                               label=self._application)
+        for xml_path in pvs.aliases:
+            xmlEleTree.SubElement(cfg_xml_source, 'alias', varLabel=pvs.aliases[xml_path], xmlPath=xml_path)
+        if self._file[-4:] == '.xml':
+            db_path = self._file[-4:] + '.db'
+        else:
+            db_path = self._application + '.db'
+        # Generate db file definition
+        cfg_xml_output_db = xmlEleTree.SubElement(cfg_xml_root, 'outputfile', type='db', path=db_path)
+        # Set file generic 'fields'
+        xmlEleTree.SubElement(cfg_xml_output_db, 'macro', placeholder=macro, length='10')  # Macro length generic
+        xmlEleTree.SubElement(cfg_xml_output_db, 'field', type='DTYP', value='ChimeraTK')
+        for rec_type in pvs.recordtypes():
+            cfg_xml_recordtype = xmlEleTree.SubElement(cfg_xml_output_db, 'recordgroup', type=rec_type)
+            # Extract records of same type
+            records = pvs.records_of_type(rec_type)
+            # Find default fields
+            record_fields = Table(list(records['fields'][0].keys()), records['fields'])  # type: Table
+            for field_name in record_fields._head:
+                field_val = record_fields[field_name]  # type: List[Any]
+                field_val_elements = list(set(field_val))
+                if len(field_val_elements) == 1:
+                    xmlEleTree.SubElement(cfg_xml_recordtype, 'field', type=field_name, value=field_val_elements[0])
+                    for record in records:
+                        record['fields'].pop(field_name, None)
+            for record in records:
+                cfg_xml_record = xmlEleTree.SubElement(cfg_xml_recordtype, 'record',
+                                                       pvName=record['pvName'],
+                                                       source=record['devicePath'])
+                fields = record['fields']
+                for field in fields:
+                    xmlEleTree.SubElement(cfg_xml_record, 'field', type=field, value=fields[field])
+        xml_element_tree = xmlEleTree.ElementTree(cfg_xml_root)
+        xml_element_tree.write(cfg_path, encoding='utf-8', xml_declaration=True)
 
 
 def expand_alias(in_string, alias_dict):
@@ -244,99 +759,7 @@ def expand_alias(in_string, alias_dict):
     return out
 
 
-def make_index(xml_node, ns_prefix, ns_dict, pv_path=''):
-    """
-    Recursive function to iterate through the xml tree and isolate the 'variables'
-    while maintaining the path in order to generate an index.
-    Takes:
-        xml_node: xml handle to start the recursion
-        ns_prefix: Namespace prefix (without ':')
-        ns_dict: Namespace dictionary, containing nsPrefix
-        pv_path: Path to the node, from which the function is called.
-    Returns:
-        index: dictionary, holding xpath and handle for the corresponding 'variable'-node
-    """
-    index = {}
-    for v in xml_node.findall(ns_prefix + ':variable', ns_dict):
-        index[pv_path + v.get('name')] = v
-    for d in xml_node.findall(ns_prefix + ':directory', ns_dict):
-        index.update(make_index(d, ns_prefix, ns_dict, pv_path=pv_path + d.get('name') + '/'))
-    return index
-
-
-def process_xml_variable(source_handle):
-    """
-    Processes source file, defined in 'sourcefile' tag, with type 'xml-variables'.
-    Returns table holding the content of sourcefile.
-    """
-    if source_handle.get("type") != "xml-variables":
-        raise XmlNodeError(source_handle.tag, 'sourcefile is not defined as type = xml-variables.')
-    # Dictionary to convert c types into EPICS counterparts
-    type_conversion = {'int64': 'INT64',
-                       'uint64': 'UINT64',
-                       'int32': 'LONG',
-                       'uint32': 'ULONG',
-                       'int16': 'SHORT',
-                       'uint16': 'USHORT',
-                       'int8': 'CHAR',
-                       'uint8': 'UCHAR',
-                       'double': 'DOUBLE',
-                       'float': 'FLOAT',
-                       'string': 'STRING'}
-    # Dictionary to convert "direction" to EPICS IN/OUT
-    direction = {'control_system_to_application': 'OUTPUT',
-                 'control_system_to_application_with_return': 'OUTPUT',
-                 'application_to_control_system': 'INPUT',
-                 'application_to_control_system_with_return': 'INPUT'}
-    # Initialize output table
-    out = Table(['VariablePath', 'ValueType', 'NumberOfElements', 'Direction', 'Unit', 'Description'])
-    # Getting xml parsing essentials
-    label = source_handle.get("label")
-    tree = xmlEleTree.parse(source_handle.get("path"))
-    root = tree.getroot()
-    namespace = {label: source_handle.get("namespace")}
-    # Indexing "variables" in xml file
-    index = make_index(root, label, namespace)
-    # Extract Information from source xml
-    for variable in index.items():
-        # Error Management
-        var_path = variable[0]
-        type_str = ''
-        try:
-            type_str = variable[1].find(label + ':value_type', namespace).text
-            v_type = type_conversion[type_str]
-        except KeyError:
-            sys.stderr.write('Value type "' +
-                             type_str +
-                             '" is not known!')
-            v_type = None
-        except AttributeError:
-            sys.stderr.write('Attribute "value_type" not found in ' +
-                             AsciiFormat.bold(var_path))
-            v_type = None
-        try:
-            var_direction = direction[variable[1].find(label + ':direction', namespace).text]
-        except AttributeError:
-            sys.stderr.write('Attribute "direction" not found in ' +
-                             AsciiFormat.bold(var_path))
-            var_direction = None
-        try:
-            var_unit = variable[1].find(label + ':unit', namespace).text
-        except AttributeError:
-            sys.stderr.write('Attribute "unit" not found in ' +
-                             AsciiFormat.bold(var_path))
-            var_unit = ''
-        out.add({
-            'VariablePath': var_path,
-            'ValueType': v_type,
-            'Direction': var_direction,
-            'Unit': var_unit,
-            'Description': variable[1].find(label + ':description', namespace).text,
-            'NumberOfElements': int(variable[1].find(label + ':numberOfElements', namespace).text)})
-    return out
-
-
-def find_x_dir(xml_root, ns_prefix, ns_dict, xpath):
+def find_x_dir(xml_root, ns_prefix, ns_dict, xpath, logger: Logging = sys.stderr):
     """
     Returns address of directory-node, described in xPath.
     """
@@ -346,7 +769,7 @@ def find_x_dir(xml_root, ns_prefix, ns_dict, xpath):
         if len(temp) == 0:
             raise XmlNodeError(xpath, 'findXDir: "directory" node does not exist!')
         elif len(temp) > 1:
-            sys.stderr.write(
+            logger.write(
                 AsciiFormat.warning +
                 'Multiple directory-nodes named ' +
                 xml_node +
@@ -370,7 +793,7 @@ def xml_tag_description(xml_node):
     return output
 
 
-def get_macro(xml_node, ns_prefix, ns_dict):
+def get_macro(xml_node, ns_prefix, ns_dict, logger: Logging = sys.stderr):
     """
     Returns a struct holding length and placeholder as defined in the FIRST "macro" tag
     under the xml.etree Element, given in "node"
@@ -386,19 +809,19 @@ def get_macro(xml_node, ns_prefix, ns_dict):
         temp_length = output.node.get('length')
         temp_ph = output.node.get('placeholder')
         if temp_length is None:  # "macro"-child exists, but has no "length"-attribute
-            sys.stderr.write(AsciiFormat.error +
-                             'No "length" was defined for macro in' +
-                             whoami +
-                             '! PV name(s) will have no macro.\n')
+            logger.write(AsciiFormat.error +
+                         'No "length" was defined for macro in' +
+                         whoami +
+                         '! PV name(s) will have no macro.')
             output.length = 0
             output.placeholder = ''
         else:
             output.length = int(temp_length)
         if temp_ph is None:  # "macro"-child exists, but has no "placeholder"-attribute
-            sys.stderr.write(AsciiFormat.error +
-                             'No "placeholder" was defined for macro in' +
-                             whoami +
-                             '! PV name(s) will have no macro.\n')
+            logger.write(AsciiFormat.error +
+                         'No "placeholder" was defined for macro in' +
+                         whoami +
+                         '! PV name(s) will have no macro.')
             output.length = 0
             output.placeholder = ''
         else:  # Everything is as expected
@@ -406,7 +829,7 @@ def get_macro(xml_node, ns_prefix, ns_dict):
     return output
 
 
-def get_autosave(xml_node, ns_prefix, ns_dict):
+def get_autosave(xml_node, ns_prefix, ns_dict, logger: Logging = sys.stderr):
     """
     Returns a boolean as defined in the FIRST "autosave" tag under the xml.etree Element, given in "node".
     "nsDict" is a dict holding "nsPrefix" and namespace(s) as key:value pairs.
@@ -417,28 +840,29 @@ def get_autosave(xml_node, ns_prefix, ns_dict):
     if output.node is None:  # There is no 'autosave' child in this xml element
         output.active = None
     elif output.node.get('isActive') is None:  # autosave child exists, but has no "isActive"-attribute
-        sys.stderr.write(AsciiFormat.error +
-                         'No "isActive" was defined for autosave in' +
-                         whoami +
-                         '! PV will not be added to autosave.\n')
+        logger.write(AsciiFormat.error +
+                     'No "isActive" was defined for autosave in' +
+                     whoami +
+                     '! PV will not be added to autosave.')
         output.active = None
     elif output.node.get('isActive').lower() not in ['true', 'false']:  # "isActive"-attribute holds unrecognized value
-        sys.stderr.write(AsciiFormat.error +
-                         '"isActive", defined for autosave in' +
-                         whoami +
-                         ' has to be "true" or "false" (not case-sensitive), but is not! '
-                         'PV will not be added to autosave.\n')
+        logger.write(AsciiFormat.error +
+                     '"isActive", defined for autosave in' +
+                     whoami +
+                     ' has to be "true" or "false" (not case-sensitive), but is not! '
+                     'PV will not be added to autosave.')
         output.active = None
     else:  # Everything is as expected
         output.active = {'true': True, 'false': False}[output.node.get('isActive').lower()]
     return output.active
 
 
-def get_fields(xml_node, ns_prefix, ns_dict):
+def get_fields(xml_node, ns_prefix, ns_dict, logger: Logging = sys.stderr):
     """
     Returns a dictionary holding all "field" tags type:value attributes under the xml.etree Element,
      given in "xml_node" as key:value pairs.
     "ns-dict" is a dict holding "ns-prefix" and namespace(s) as key:value pairs.
+    :rtype: dict
     """
     output = dict()
     field_nodes = xml_node.findall(ns_prefix + ':field', ns_dict)
@@ -448,19 +872,19 @@ def get_fields(xml_node, ns_prefix, ns_dict):
         field_value = field.get('value')
         if field_type is None:
             if field_value is None:
-                sys.stderr.write(AsciiFormat.error +
-                                 'No "value" attribute was defined for a "field" child in' +
-                                 whoami +
-                                 '! "field" element will be ignored! \n')
-            sys.stderr.write(AsciiFormat.error +
-                             'No "type" attribute was defined for a "field" child in' +
+                logger.write(AsciiFormat.error +
+                             'No "value" attribute was defined for a "field" child in ' +
                              whoami +
-                             '! "field" element will be ignored! \n')
+                             '! "field" element will be ignored!')
+            logger.write(AsciiFormat.error +
+                         'No "type" attribute was defined for a "field" child in ' +
+                         whoami +
+                         '! "field" element will be ignored!')
         elif field_value is None:
-            sys.stderr.write(AsciiFormat.error +
-                             'No "value" attribute was defined for a "field" child in' +
-                             whoami +
-                             '! "field" element will be ignored! \n')
+            logger.write(AsciiFormat.error +
+                         'No "value" attribute was defined for a "field" child in ' +
+                         whoami +
+                         '! "field" element will be ignored!')
         else:
             output[field_type] = field_value  # Fields of the same type overwrite!
     return output
@@ -468,8 +892,16 @@ def get_fields(xml_node, ns_prefix, ns_dict):
 
 CLAP = argparse.ArgumentParser(
     description='Generates EPICS PV database for every \'PV\' defined in ChimeraTK-xml file to EPICS database file.')
-CLAP.add_argument('-c', help='Path to configuration file. Defaults to "mapConfig.xml"', metavar='path')
-CLAP.add_argument('-v', help='Activates verbosity', action='store_true')
+CLAP.add_argument('-c',
+                  help='Path to configuration file. Defaults to "mapConfig.xml"',
+                  metavar='path')
+CLAP.add_argument('-v',
+                  help='Activates verbosity.',
+                  action='store_true')
+CLAP.add_argument('-l',
+                  help='Define path to logfile. Defaults to dbGen.log in CWD.',
+                  metavar='path',
+                  default='dbGen.log')
 # Parse Command Line Arguments
 CLA = CLAP.parse_args()
 
@@ -489,9 +921,12 @@ if not os.path.isdir(inifile_path):
 elif not os.path.isfile(os.path.join(inifile_path, inifile_name)):
     sys.exit(AsciiFormat.error + 'File ' + inifile_name + ' does not exist.')
 
+# initiate logging
+log = Logging(CLA.l)
+
 # Parse config file os.path.join(inifilePath, inifileName)
 if CLA.v:
-    print("Reading: " + os.path.join(inifile_path, inifile_name) + '\n')
+    log.write("Reading: " + os.path.join(inifile_path, inifile_name))
 cfgTree = xmlEleTree.parse(os.path.join(inifile_path, inifile_name))
 cfgRoot = cfgTree.getroot()
 
@@ -500,23 +935,9 @@ configNS = {'EPICSmap': 'https://github.com/ChimeraTK/ControlSystemAdapter-EPICS
 # Get a list of all sourcefile entries
 sourcefiles = cfgRoot.findall("EPICSmap:sourcefile", configNS)
 
-db = PVDb()
-db.add({'ID': 'SYS/PV1',
-        'pvName': 'PV-Name',
-        'autosave': False,
-        'doku': True,
-        'fields': {'FIELD1': 'Val1', 'FIELD2': 'Val2'}})
-db.add({'ID': 'SYS/PV2',
-        'pvName': 'PV-Name2',
-        'autosave': False,
-        'doku': True,
-        'fields': {'FIELD1': 'Val12', 'FIELD2': 'Val22'}})
-print(str(db))
-print(db['SYS/PV1'][4]['FIELD1'])
-
 # Check existence of sourcefile element(s)
 if len(sourcefiles) == 0:
-    sys.stderr.write(AsciiFormat.warning + 'No source files are defined!\n')
+    log.write(AsciiFormat.warning + 'No source files are defined!\n')
 else:
     if CLA.v:
         sourcelist = []
@@ -528,18 +949,20 @@ else:
     for sfile in sourcefiles:
         # Check if sourcefile exists
         if not os.path.isfile(sfile.get("path")):
-            sys.stderr.write(
+            log.write(
                 AsciiFormat.warning +
-                "File \'" +
-                os.path.abspath(sfile.get("path")) +
-                "\' does not exist!\n")
+                'File "' +
+                os.path.abspath(sfile.get('path')) +
+                '" does not exist!')
         # Parse source file according to type
         sourceTag = sfile.get("label")
         if sfile.get("type") == "xml-variables":
-            source[sourceTag] = process_xml_variable(sfile)
             # parse aliases
             for item in sfile.findall('EPICSmap:alias', configNS):
-                alias[sourceTag + '.' + item.get('varLabel')] = item.get('xmlPath')
+                alias[item.get('xmlPath')] = item.get('varLabel')
+            # parse xmlfile
+            source[sourceTag] = XmlSource(sfile.get('path'), sfile.get('namespace'), alias, logger=log)
+            source[sourceTag].generate_config_file('test_cfg.xml', macro='P')
         else:
             sys.stderr.write(
                 AsciiFormat.warning +
@@ -569,24 +992,30 @@ for outFile in outputList:
     if outFile['type'] == 'db':
         node = outFile['handle']
         # process attributes for the whole file
-        macro_file = get_macro(node, 'EPICSmap', configNS)
-        autosave_file = {None: False, False: False, True: True}[get_autosave(node, 'EPICSmap', configNS)]
-        fields_file = get_fields(node, 'EPICSmap', configNS)
+        macro_file = get_macro(node, 'EPICSmap', configNS, logger=log)
+        autosave_file = {None: False, False: False, True: True}[get_autosave(node, 'EPICSmap', configNS, logger=log)]
+        fields_file = get_fields(node, 'EPICSmap', configNS, logger=log)
         # process recordgroups
         rgroupList = node.findall('EPICSmap' + ':recordgroup', configNS)
         for rgroupNode in rgroupList:
-            macro_temp = get_macro(rgroupNode, 'EPICSmap', configNS)
+            macro_temp = get_macro(rgroupNode, 'EPICSmap', configNS, logger=log)
             if macro_temp.node is not None:
                 macro_rgroup = macro_temp
             else:
                 macro_rgroup = macro_file
-            autosave_temp = get_autosave(rgroupNode, 'EPICSmap', configNS)
+            autosave_temp = get_autosave(rgroupNode, 'EPICSmap', configNS, logger=log)
             if autosave_temp is not None:
                 autosave_rgroup = autosave_temp
             else:
                 autosave_rgroup = autosave_file
             fields_rgroup = fields_file
-            fields_rgroup.update(get_fields(rgroupNode, 'EPICSmap', configNS))
+            fields_rgroup.update(get_fields(rgroupNode, 'EPICSmap', configNS, logger=log))
 
-        print(str(macro_rgroup.length) + '\t' + macro_rgroup.placeholder + '\n' + str(autosave_rgroup) + '\n' + str(
-            fields_rgroup))
+        print(str(macro_rgroup.length) +
+              '\t' +
+              macro_rgroup.placeholder +
+              '\n' +
+              str(autosave_rgroup) +
+              '\n' +
+              str(fields_rgroup) +
+              '\n')
