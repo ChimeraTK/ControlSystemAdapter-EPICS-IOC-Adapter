@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 """
-Tool to generate EPICS PV database, autosave requirement file and documentation for PV database
-from a configuration xml-file and various other sources
-Written and tested for Python 3.5.2 @ June 2019 by Patrick Nonn for DESY/MSK
+Tool to map ChimeraTK variables and possible other sources to EPICS database via
+a configuration xml-file.
+Written and tested for Python 3.5.2 by Patrick Nonn for DESY/MSK
 """
 
 import argparse  # Parse command line arguments
@@ -19,15 +19,18 @@ VERSION = '1.0'
 Changelog:
 
 1.0:
-    First release
+    22.Apr.2020: First release
 '''
 
 
+# Function to abbreviate long terms
 def abbreviate(in_word: str) -> str:
     """
     Function to abbreviate strings by look-up table.
-    :param in_word: String
-    :return: Abbreviation, if in_word is key in "abbr"-dictionary, in_word else.
+    :param in_word: Word to be abbreviated.
+    :type in_word: str
+    :return: Abbreviation, if in_word is in "abbr"-dictionary, in_word else.
+    :rtype: str
     """
     if not isinstance(in_word, str):
         raise TypeError('The argument "input" of function "abbreviate" has to be of type string!')
@@ -57,19 +60,24 @@ def abbreviate(in_word: str) -> str:
     return output
 
 
-# Class to build structs
-class Struct:
-    pass
-
-
 # Class for text formatting
 class AsciiFormat:
+    """
+    Class to provide formatted strings for stdout.
+    """
     warning = '\033[1m\033[93mWarning:\033[0m '
     error = '\033[1m\033[91mError:\033[0m '
 
     @staticmethod
     def bold(text):
-        return '\033[1m' + text + '\033[0m'
+        """
+        Makes the input be printed out as bold test in stdout
+        :param text: Input text
+        :type text: Any
+        :return: Formatted text
+        :rtype: str
+        """
+        return '\033[1m' + str(text) + '\033[0m'
 
 
 # Define Exceptions
@@ -82,7 +90,14 @@ class XmlNodeError(Exception):
 
 
 class SkipLoop(Exception):
-    """Exception raised, to skip a loop outside of the actual one"""
+    """Exception raised, to skip a loop outside of the innermost one"""
+
+    def __init__(self, message):
+        self.message = message
+
+
+class SourceLoadError(Exception):
+    """Exception to handle unseccessfull attempts to load sourcefile"""
 
     def __init__(self, message):
         self.message = message
@@ -93,8 +108,7 @@ class SkipLoop(Exception):
 
 class Logging:
     """
-    Class to handle logging
-    depends on: os, sys, AsciiFormat
+    Class to provide logging to file and stdout
     """
 
     def __init__(self, logfile_path: str):
@@ -129,7 +143,9 @@ class Logging:
         """
         Recursive method to change strings containing ascii formatting for stdout to plain ascii.
         :param in_str: String to be changed
-        :return: String without ascii formatting
+        :type in_str: str
+        :return: String with changed formatting
+        :rtype: str
         """
         if not isinstance(in_str, str):
             raise TypeError('_markdown takes only string type attributes')
@@ -152,8 +168,9 @@ class Logging:
 
     def write(self, log_message: str):
         """
-        Method to write to log file and stderr
-        :param log_message: String holding message to be written, formatted for stderr
+        Writes to log file and stderr.
+        :param log_message: Message to be written, formatted for stderr/stdout
+        :type log_message: str
         """
         if not isinstance(log_message, str):
             raise TypeError('Log takes only string type attributes')
@@ -279,14 +296,14 @@ class Table:
         """
         return len(self._table)
 
-    # Magic method to initialize iterator.
     def __iter__(self):
+        """Iterator initialization"""
         self._index = 0
         self._row = None
         return self
 
-    # Magic method to increment iterator.
     def __next__(self):
+        """Iterator incrementation"""
         if self._index > len(self._table) - 1:
             del self._index
             del self._row
@@ -328,7 +345,7 @@ class Table:
 
     def remove_column(self, col_name: str):
         """
-        Method to remove column
+        Method to remove column by column name
 
         :param col_name: Name of the column to be removed.
         :type col_name: str
@@ -400,31 +417,36 @@ class DbFile(Table):
 
     def __getitem__(self, pv_id: str) -> dict:
         """
-        Magic method to access dataset (row) with the field 'devicePath' matching pv_id
-        :param pv_id: String to search for in field 'devicePath'
-        :return: Dictionary holding the whole dataset
+        Magic method, accesses dataset (row) with the field 'devicePath' matching pv_id
+        Raises
+        :param pv_id: Term to match in field 'devicePath'
+        :type pv_id: str
+        :return: Dataset with matching devicePath
+        :rtype: dict
         """
         if not isinstance(pv_id, str):  # Check Type
             raise TypeError('Attribute of PVDb[] has to be string.')
         query_result = super().query({'devicePath': pv_id})  # Find Entry
-        if len(query_result) == 0:  # Check existence
+        if not query_result:  # Check existence
             self.log.write(AsciiFormat.error
                            + 'PV with device path '
                            + pv_id + ' does not exist in PVDb')
         elif len(query_result) == 1:  # Usual case
             index = self._table.index(query_result[0])
             return self._table[index]
-        elif len(query_result) >= 1:  # Check Multiple Entries
+        elif len(query_result) > 1:  # Check Multiple Entries
             self.log.write(AsciiFormat.error +
                            'Multiple PVs with device path '
                            + pv_id
                            + ' found in PVDb! PVDb might be corrupted!')
+            index = self._table.index(query_result[0])
+            return self._table[index]
         else:  # For unforeseen cases
             raise RuntimeError('Something has gone wrong!')
 
     def add(self, record: Dict[str, Any]):
         """
-        Method to add EPICS record to database, including checking for compliance with EPICS.
+        Adds EPICS record to database, including some checking for compliance with EPICS.
         :param record: EPICS record to be added to database
         :type record: dict
         """
@@ -505,9 +527,16 @@ class DbFile(Table):
             pass
         if record_ftvl_field in type_conversion:
             record['fields']['FTVL'] = type_conversion[record_ftvl_field]
+        # Call add of class Table, to add
         super().add(record)
 
     def write_db_file(self, source: Optional[str] = None):
+        """
+        Generate EPICS db file from database
+        :param source: Config file used for generation, for comment at head of file.
+        :type source: str
+        """
+        # Assemble file content as one string
         out_str = '# File generated by dbGenerator version ' + str(VERSION)
         if source is not None:
             out_str += ' from configuration file:\n# "' + source + '"\n'
@@ -521,27 +550,21 @@ class DbFile(Table):
                          + '")\n' \
                          + '}\n'
             out_str += record_str + '\n'
+        # Write string to file
         with open(self.file_path, 'w') as db_file:
             db_file.write(out_str)
 
 
 class XmlSource(Table):
-    """
-    Class to handle data from xml files, generated with <ChimeraTK-server>-xmlGenerator.
-    """
+    """Class to handle data from xml files, generated with <ChimeraTK-server>-xmlGenerator."""
 
     def __init__(self,
                  xml_filepath: str,
-                 namespace: str,
                  logger: Any = sys.stderr,
                  aliases: Optional[Dict[str, List[str]]] = None):
         """
-        Constructor of XmlSource object
-
         :param xml_filepath: Filename or path to xml file to be parsed
         :type xml_filepath: str, path-like
-        :param namespace: Namespace used in xml file
-        :type namespace: str
         :param logger: Object with "write" method, i.e. sys.stderr or Logging-class object
         :type logger: object
         :param aliases: Aliases for expansion
@@ -560,19 +583,31 @@ class XmlSource(Table):
                           'direction',
                           'unit',
                           'description'])
-        # Indexing "variables" in xml file
-        if isinstance(namespace, str):
-            self.ns_dict = {'namespace_prefix': namespace}
-        else:
-            raise TypeError('The attribute "namespace" of class XmlSource has to be a string!')
+        self.namespace = '{https://github.com/ChimeraTK/ApplicationCore}'
         self._index = []
         if aliases is None:
             self.aliases = {}
         else:
             self.aliases = aliases
         self.file = os.path.abspath(xml_filepath)
-        self._tree = xmlEleTree.parse(self.file)
+        try:
+            self._tree = xmlEleTree.parse(self.file)
+        except FileNotFoundError:
+            raise SourceLoadError(AsciiFormat.error
+                                  + 'File "'
+                                  + self.file
+                                  + '" not found!')
+        except xmlEleTree.ParseError:
+            raise SourceLoadError(AsciiFormat.error
+                                  + 'File "'
+                                  + self.file
+                                  + '" can not be parsed! Corrupt/not xml file?')
         self._root = self._tree.getroot()
+        if self._root.tag != self.namespace + 'application':
+            raise SourceLoadError(AsciiFormat.error
+                                  + 'File "'
+                                  + self.file
+                                  + '" seems not to be a ChimeraTK variable file!')
         self.application = self._root.get('name')
         self._make_index(self._root)
         # Extract Information from source xml
@@ -587,13 +622,14 @@ class XmlSource(Table):
             try:  # To catch SkipLoop
                 for val_key in var_data:
                     try:
-                        var_data[val_key] = variable['xml_address'].find('namespace_prefix:' +
-                                                                         val_key, self.ns_dict).text
+                        var_data[val_key] = variable['xml_address'].find(self.namespace + val_key).text
                     except AttributeError:
-                        self.logger.write(AsciiFormat.error +
-                                          'Attribute "value_type" not found in ' +
-                                          AsciiFormat.bold(var_path + var_name) +
-                                          '!')
+                        self.logger.write(AsciiFormat.error
+                                          + 'Attribute "'
+                                          + val_key
+                                          + '" not found in '
+                                          + AsciiFormat.bold(var_path + var_name)
+                                          + '!')
                         if val_key in ['direction', 'numberOfElements']:
                             raise SkipLoop
             except SkipLoop:
@@ -611,10 +647,9 @@ class XmlSource(Table):
                 'numberOfElements': int(var_data['numberOfElements'])
             })
 
-    # Magic method for "object[string]" accessor. Returns the row with Alias = string.
     def __getitem__(self, search_str: str) -> Dict[str, Any]:
         """
-        Magic method for []-accessor.
+        Magic method, provides []-accessor.
 
         :param search_str: String to be found in 'Alias'-column
         :type search_str: str
@@ -632,11 +667,13 @@ class XmlSource(Table):
         elif len(query_result) == 1:  # Usual case
             index = self._table.index(query_result[0])
             return self._table[index]
-        elif len(query_result) >= 1:  # Check Multiple Entries
+        elif len(query_result) > 1:  # Check Multiple Entries
             self.logger.write(AsciiFormat.error +
                               'Multiple entries with ID '
                               + search_str
                               + ' found in XmlSource! Database is corrupted!')
+            index = self._table.index(query_result[0])
+            return self._table[index]
         else:  # For unforeseen cases
             raise RuntimeError('Something has gone wrong!')
 
@@ -645,21 +682,23 @@ class XmlSource(Table):
         Recursive method to iterate through the xml tree and isolate the 'variables'
         while maintaining the path in order to generate an index.
 
-        :param xml_node: xml handle to start the recursion
-        :type xml_node: object
+        :param xml_node: xml node to recurse over
+        :type xml_node: object(xmlElementTree.Element)
         :param pv_path: Path to the node, from which the function is called.
         :type pv_path: str
         """
-        for v in xml_node.findall('namespace_prefix' + ':variable', self.ns_dict):
+        for v in xml_node.findall(self.namespace + 'variable'):
             self._index.append({'xml_address': v, 'var_path': pv_path, 'var_name': v.get('name')})
-        for d in xml_node.findall('namespace_prefix' + ':directory', self.ns_dict):
+        for d in xml_node.findall(self.namespace + 'directory'):
             self._make_index(d, pv_path=pv_path + d.get('name') + '/')
         return  # Break recursion, if no more directories found
 
-    def __add(self, row: Dict[str, Any]):  # To bend add method of parent class to hidden method
+    def __add(self, row: Dict[str, Any]):
+        """To bend add method of parent class to hidden method"""
         super().add(row)
 
-    def add(self, row):  # To hide add method of parent class
+    def add(self, row):
+        """To hide add method of parent class"""
         raise AttributeError("'XmlSource' object has no attribute 'add'")
 
     def column(self, column_head: str) -> List[Any]:
@@ -674,15 +713,14 @@ class XmlSource(Table):
 
 
 class EpicsCfg:
-    """
-    Class to read, process and generate EPICS config files
-    """
+    """Class to read, process and generate EPICS config files"""
 
     def __init__(self, cfg_file_path: str, logger: Any = sys.stderr):
         """
-        Class constructor
-        :param cfg_file_path: String holding valid path to file or directory
-        :param logger: Object with callable function "write"
+        :param cfg_file_path: Valid path to file or directory
+        :type cfg_file_path: str
+        :param logger: Where messages are written to
+        :type logger: Object with callable write function
         """
         if not callable(getattr(logger, 'write')):
             raise AttributeError('Attribute "logger" of class XmlSource has to have a callable method "write(str)"')
@@ -697,6 +735,17 @@ class EpicsCfg:
         self._sources = {}
 
     def load_source(self, source_path: str, source_label: str, source_type: str = 'xml-variables', **kwargs):
+        """
+        Adds content of source file to source-database
+        :param source_path: Path to source file
+        :type source_path: str, path-like
+        :param source_label: Label to access data in the source-database
+        :type source_label: str
+        :param source_type: Type of source file
+        :type source_type: str
+        :param kwargs: Various keyword arguments, depending on source file type
+        :type kwargs: Any
+        """
         if not isinstance(source_path, str):
             raise TypeError('Argument "source_path" of function "load_source" has to be of type string')
         if not isinstance(source_type, str):
@@ -707,19 +756,17 @@ class EpicsCfg:
                                  + ', '.join(source_types))
         if source_type == 'xml-variables':
             try:
-                kwargs['namespace']
-            except KeyError:
-                raise AttributeError('Trying to load xml-variable file "'
-                                     + source_path
-                                     + '" without providing keyword argument "namespace"!')
-            try:
                 source_aliases = kwargs['aliases']
             except KeyError:
                 source_aliases = None
-            self._sources[source_label] = XmlSource(source_path,
-                                                    kwargs['namespace'],
-                                                    logger=self.logger,
-                                                    aliases=source_aliases)
+            try:
+                self._sources[source_label] = XmlSource(source_path,
+                                                        logger=self.logger,
+                                                        aliases=source_aliases)
+            except SourceLoadError as error:
+                self.logger.write(error.message)
+        else:
+            raise AttributeError('Source type "' + str(source_type) + '" is unknown!')
 
     def generate_config_file(self, source_label: str, macro: Optional[str] = None, macro_length: Optional[int] = 0):
         """
@@ -732,11 +779,21 @@ class EpicsCfg:
         :param macro_length: Length to be reserved in pv name for macro
         :type macro_length: int
         """
-        if not isinstance(self._sources[source_label], XmlSource):
-            raise TypeError('source_label has to refer to XmlSource object in self._sources member of class EpicsCfg!')
-        xml_source = self._sources[source_label]  # type: XmlSource
         gen_log = Logging(source_label + 'CfgGen.log')  # Generate separate log file
         gen_log.write('Start of config file generation.')
+        try:
+            xml_source = self._sources[source_label]  # type: XmlSource
+        except KeyError:
+            gen_log.write(AsciiFormat.error
+                          + 'Source label "'
+                          + source_label
+                          + '" does not refer to (successfully) loaded source!')
+            return
+        if not xml_source:
+            self.logger.write(AsciiFormat.error + 'Empty source! Config file not generated!')
+            return
+        if not isinstance(self._sources[source_label], XmlSource):
+            raise TypeError('source_label has to refer to XmlSource object in self._sources member of class EpicsCfg!')
         if macro is not None:
             if not isinstance(macro, str):
                 raise TypeError('Argument "macro" has to be a string!')
@@ -903,12 +960,12 @@ class EpicsCfg:
                      'recordType': pv_recordtype,
                      'autosave': pv_autosave_determination[pv_recordtype],
                      'fields': pv_fields_determination[pv_recordtype]})
+        gen_log.write('Compile config file.')
         cfg_xmlns = 'https://github.com/ChimeraTK/ControlSystemAdapter-EPICS-IOC-Adapter'
         cfg_xml_root = xmlEleTree.Element('EPICSdb', xmlns=cfg_xmlns, application=xml_source.application)
         cfg_xml_source = xmlEleTree.SubElement(cfg_xml_root, 'sourcefile',
                                                type='xml-variables',
                                                path=xml_source.file,
-                                               namespace=xml_source.ns_dict['namespace_prefix'],
                                                label=xml_source.application)
         alias_list = {}
         for xml_path in aliases:
@@ -974,8 +1031,10 @@ class EpicsCfg:
             xml_str += indent_level * indent + tag + '\n'
             if tag[-2:] != '/>' and tag[:2] != '</':
                 indent_level += 1
+        gen_log.write('Writing file: ' + self.file_path)
         with open(self.file_path, 'w', encoding='utf-8') as file:
             file.write(xml_str)
+        gen_log.write('Config file generation complete!')
 
     def _expand(self, in_str: str, aliases: Dict[str, str], source_link: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -1019,6 +1078,13 @@ class EpicsCfg:
 
     @staticmethod
     def _process_field_element(xml_address: xmlEleTree.Element) -> Dict[str, str]:
+        """
+        Extracting type and value from field element, while checking their existence.
+        :param xml_address: xml address of field element
+        :type xml_address: xmlElementTree.Element object
+        :return: Field type and value
+        :rtype: dict
+        """
         if xml_address.tag.rsplit(sep='}')[-1] != 'field':
             raise XmlNodeError(xml_address, 'XML element not "field"!')
         field_type = xml_address.get('type')
@@ -1031,15 +1097,27 @@ class EpicsCfg:
 
     def process_cfg_file(self):
         """
-        Process existing config file!
+        Process config file and trigger db file creation.
         """
-        root_name = 'EPICSdb'
-        cfg_file_tree = xmlEleTree.parse(self.file_path)
+        try:
+            cfg_file_tree = xmlEleTree.parse(self.file_path)
+        except FileNotFoundError:
+            self.logger.write(AsciiFormat.error
+                              + 'File "'
+                              + self.file_path
+                              + '" not found!')
+            return
+        except xmlEleTree.ParseError:
+            self.logger.write(AsciiFormat.error
+                              + 'File "'
+                              + self.file_path
+                              + '" can not be parsed! Corrupt/not xml file?')
+            return
         cfg_file_root = cfg_file_tree.getroot()
-        ns = {'ns': cfg_file_root.tag[1:-1 - len(root_name)]}
+        ns = {'ns': cfg_file_root.tag.split(sep='{')[1].split(sep='}')[0]}
         # Load sources
         cfg_sourcefiles = cfg_file_root.findall('ns:sourcefile', ns)
-        if len(cfg_sourcefiles) == 0:
+        if not cfg_sourcefiles:
             self.logger.write('No sources are defined in ' + self.file_path)
         else:
             for sourcefile in cfg_sourcefiles:
@@ -1065,7 +1143,6 @@ class EpicsCfg:
                     # parse xmlfile
                     self.load_source(sourcefile.get('path'),
                                      sourcefile_label,
-                                     namespace=sourcefile.get('namespace'),
                                      aliases=aliases)
                 else:
                     self.logger.write(
@@ -1079,7 +1156,7 @@ class EpicsCfg:
                     continue
         # Process output files
         cfg_outputfiles = cfg_file_root.findall('ns:outputfile', ns)
-        if len(cfg_outputfiles) == 0:
+        if not cfg_outputfiles:
             self.logger.write('No output files are defined in ' + self.file_path)
             sys.exit(0)
         for output_file in cfg_outputfiles:
@@ -1177,7 +1254,7 @@ class EpicsCfg:
             # Write db-file
             database.write_db_file(self.file_path)
             # Write autosave .req-file
-            if output_file.get('autosave_path') is None:
+            if output_file.get('autosavePath') is None:
                 autosave_path = os.path.abspath(output_file.get('path').rsplit(sep='.', maxsplit=1)[0] + '.req')
             else:
                 autosave_path = os.path.abspath(output_file.get('autosave_path'))
@@ -1188,17 +1265,15 @@ class EpicsCfg:
 
 CLAP = argparse.ArgumentParser(
     description='Generates EPICS PV database for every \'PV\' defined in ChimeraTK-xml file to EPICS database file.')
-CLAP.add_argument('-c',
-                  help='Path to configuration file. Defaults to "mapConfig.xml"',
-                  metavar='path',
-                  default='EPICS_mapping.xml')
+CLAP.add_argument('config_file',
+                  help='Path to configuration file. Defaults to "mapConfig.xml"')
 CLAP.add_argument('-l',
                   help='Define path to logfile. Defaults to dbGen.log in CWD.',
-                  metavar='path',
+                  metavar='logfile',
                   default='dbGen.log')
 CLAP.add_argument('-g',
                   help='Generates config file from xml-variables file, specified in "path".',
-                  metavar='path')
+                  metavar='variable_file')
 # Parse Command Line Arguments
 CLA = CLAP.parse_args()
 
@@ -1206,9 +1281,9 @@ CLA = CLAP.parse_args()
 log = Logging(CLA.l)
 
 if CLA.g is not None:  # generate config file
-    config = EpicsCfg(os.path.abspath(CLA.c), logger=log)
-    config.load_source(CLA.g, 'WatchdogServer', namespace='https://github.com/ChimeraTK/ApplicationCore')
-    config.generate_config_file('WatchdogServer')
+    config = EpicsCfg(os.path.abspath(CLA.config_file), logger=log)
+    config.load_source(CLA.g, 'xmlLabel')
+    config.generate_config_file('xmlLabel')
 else:  # Load config file
-    config = EpicsCfg(os.path.abspath(CLA.c), logger=log)
+    config = EpicsCfg(os.path.abspath(CLA.config_file), logger=log)
     config.process_cfg_file()
