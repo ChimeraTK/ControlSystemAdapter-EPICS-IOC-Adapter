@@ -1213,7 +1213,7 @@ class EpicsCfg:
                         continue
                     # Read field elements of record
                     record_fields = dict(recordgroup_tier_fields)
-                    for field in record.findall('field'):
+                    for field in record.findall('ns:field', ns):
                         try:
                             record_fields.update(self._process_field_element(field))
                         except XmlNodeError as inst:
@@ -1226,6 +1226,9 @@ class EpicsCfg:
                         source_label = None
                         source_path = record.get('source')
                     if source_label is None:  # No string expansion without defined source
+                        for key in record_fields:
+                            record_fields[key] = self._expand(record_fields[key], {}, {'source': record.get('source'),
+                                                                                       'pvName': record.get('pvName')})
                         database.add({
                             'devicePath': source_path,
                             'pvName': record.get('pvName'),
@@ -1246,9 +1249,9 @@ class EpicsCfg:
                         })
                         doc_list.append(record.get('pvName') + ' (' + record_type + '): '
                                         + self._expand('+{:description}', source_aliases, source_link))
-                    if str(recordgroup.get('autosave')).lower() in ['true', '1']:
+                    if str(record.get('autosave')).lower() in ['true', '1']:
                         record_autosave = True
-                    elif str(recordgroup.get('autosave')).lower() in ['false', '0']:
+                    elif str(record.get('autosave')).lower() in ['false', '0']:
                         record_autosave = False
                     else:
                         record_autosave = recordgroup_autosave
@@ -1260,7 +1263,7 @@ class EpicsCfg:
             if output_file.get('autosavePath') is None:
                 autosave_path = os.path.abspath(output_file.get('path').rsplit(sep='.', maxsplit=1)[0] + '.req')
             else:
-                autosave_path = os.path.abspath(output_file.get('autosave_path'))
+                autosave_path = os.path.abspath(output_file.get('autosavePath'))
             if autosave_list:
                 with open(autosave_path, 'w') as autosave_file:
                     autosave_file.write('\n'.join(autosave_list))
