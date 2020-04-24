@@ -1168,6 +1168,7 @@ class EpicsCfg:
             if str(output_file.get('autosave')).lower in ['true', '1']:
                 file_autosave = True
             autosave_list = []
+            doc_list = []
             file_tier_fields = {}
             for field in output_file.findall('ns:field', ns):
                 try:
@@ -1243,6 +1244,8 @@ class EpicsCfg:
                             'recordType': record_type,
                             'fields': record_fields
                         })
+                        doc_list.append(record.get('pvName') + ' (' + record_type + '): '
+                                        + self._expand('+{:description}', source_aliases, source_link))
                     if str(recordgroup.get('autosave')).lower() in ['true', '1']:
                         record_autosave = True
                     elif str(recordgroup.get('autosave')).lower() in ['false', '0']:
@@ -1261,6 +1264,12 @@ class EpicsCfg:
             if autosave_list:
                 with open(autosave_path, 'w') as autosave_file:
                     autosave_file.write('\n'.join(autosave_list))
+            # Generate documentation for PVs
+            docfile_path = os.path.abspath(output_file.get('path').rsplit(sep='.', maxsplit=1)[0] + '_descriptions.txt')
+            if doc_list:
+                with open(docfile_path, 'w') as docfile:
+                    docfile.write('Descriptions for PVs defined in "' + self.file_path + '"\n\n'
+                                  + '\n'.join(doc_list))
 
 
 CLAP = argparse.ArgumentParser(
