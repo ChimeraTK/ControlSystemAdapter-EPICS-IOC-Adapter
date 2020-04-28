@@ -38,7 +38,7 @@ add_custom_target(${PROJECT_NAME}-autosave ALL COMMAND ${CMAKE_CURRENT_SOURCE_DI
 # build the ControlSystemAdapter-EPICS
 add_custom_target(${PROJECT_NAME}-adapter ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAdapter ${CMAKE_CURRENT_SOURCE_DIR}/ChimeraTK-ControlSystemAdapter-EPICS ${ChimeraTK-ControlSystemAdapter_PREFIX}
                                               WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-                                              DEPENDS ${PROJECT_NAME}-epics)
+                                              DEPENDS ${PROJECT_NAME}-autosave)
 
 # build the IOC
 set(iocSources ${PROJECT_BINARY_DIR}/src/ChimeraTKMain.cpp ${PROJECT_BINARY_DIR}/src/ChimeraTK_registerRecordDeviceDriver.cpp)
