@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-"""
+"""@package docstring
 Tool to map ChimeraTK variables and possible other sources to EPICS database via
 a configuration xml-file.
 Written and tested for Python 3.5.2 by Patrick Nonn for DESY/MSK
@@ -51,7 +51,39 @@ def abbreviate(in_word: str) -> str:
         'request': 'req',
         'standard': 'std',
         'statistics': 'stats',
-        'watchdog': 'wd'
+        'watchdog': 'wd',
+        'adcboard0': 'adcb0',
+        'channel0': 'ch0',
+        'channel1': 'ch1',
+        'channel2': 'ch2',
+        'channel3': 'ch3',
+        'channel4': 'ch4',
+        'channel5': 'ch5',
+        'channel6': 'ch6',
+        'channel7': 'ch7',
+        'actual': 'act',
+        'automation': 'auto',
+        'feedback': 'fb',
+        'feedforward': 'ff',
+        'setpoint': 'sp',
+        'vectormodulator': 'vm',
+        'amplitudephaseerror': 'aperror',
+        'averagingwindow': 'avgwin',
+        'cascadeinputautomation': 'cadeinauto',
+        'cascadeinputovc': 'cadeinovc',
+        'commoncalibration': 'commoncal',
+        'controller': 'ctrl',
+        'devices': 'dev',
+        'forwardvectorsum': 'fwdvs',
+        'learningfeedforward': 'lff',
+        'outputvectorcorrection': 'ovc',
+        'mimocoefficients': 'mimocoeff',
+        'phasemodulation': 'phasemod',
+        'referencepoint': 'refpoint',
+        'smithcoefficients': 'smithcoeff',
+        'vectorsum': 'vs',
+        'proportional': 'prop',
+        'datalosscounter': 'dlcount'
     }
     try:
         output = abbr[in_word]
@@ -444,6 +476,25 @@ class DbFile(Table):
         else:  # For unforeseen cases
             raise RuntimeError('Something has gone wrong!')
 
+    def _remove_macros(self, input: str) -> str:
+        """
+        Recursively remove Macros from input
+
+        :param input: String to remove macros from.
+        :type input: str
+        :return: String with macro found first, removed.
+        :rtype: str
+        """
+        if not isinstance(input, str):
+            raise TypeError('Attribute of method "_remove_macros" has to be of type string!')
+        open_pos = input.find('$(')
+        if open_pos == -1:  # End recursion
+            return input
+        else:
+            close_pos = input.find(')', open_pos) + 1
+            output = input[:open_pos] + input[close_pos:]
+            return self._remove_macros(output)
+
     def add(self, record: Dict[str, Any]):
         """
         Adds EPICS record to database, including some checking for compliance with EPICS.
@@ -459,13 +510,15 @@ class DbFile(Table):
             except KeyError:
                 raise AttributeError(AsciiFormat.error + 'Attribute "record" is missing at least one key!')
         # Check length of PV name
-        length_pv_name = len(record['pvName']) + self.macro_reserve
-        if length_pv_name > 39:
+        pv_name_max = 39
+        length_pv_name = len(self._remove_macros(record['pvName'])) + self.macro_reserve
+        if length_pv_name > pv_name_max:
             self.log.write(AsciiFormat.warning
                            + 'PV name "'
                            + record['pvName']
-                           + '" is ' + str(length_pv_name - 39)
-                           + 'characters too long!')
+                           + '" is '
+                           + str(length_pv_name - pv_name_max)
+                           + ' characters too long!')
         # Check record type
         known_record_types = ['int64out',
                               'int64in',
@@ -1118,7 +1171,7 @@ class EpicsCfg:
         # Load sources
         cfg_sourcefiles = cfg_file_root.findall('ns:sourcefile', ns)
         if not cfg_sourcefiles:
-            self.logger.write('No sources are defined in ' + self.file_path)
+            self.logger.write(AsciiFormat.warning + 'No sources are defined in ' + self.file_path)
         else:
             for sourcefile in cfg_sourcefiles:
                 # Check if sourcefile exists
@@ -1129,8 +1182,10 @@ class EpicsCfg:
                     continue
                 # Parse source file according to type
                 sourcefile_label = sourcefile.get('label')
+                self.logger.write('Source ' + sourcefile_label + ' is loaded from "' + sourcefile.get('path') + '".')
                 if sourcefile.get('type') == 'xml-variables':
                     # parse aliases
+                    self.logger.write('...Processing aliases.')
                     aliases = {}
                     for sourcefile_alias in sourcefile.findall('ns:alias', ns):
                         alias_attributes = sourcefile_alias.attrib
@@ -1141,6 +1196,7 @@ class EpicsCfg:
                                               + 'Alias element is missing either "handle" or "surrogate" attribute!')
                             continue
                     # parse xmlfile
+                    self.logger.write('...Loading source xml file.')
                     self.load_source(sourcefile.get('path'),
                                      sourcefile_label,
                                      aliases=aliases)
@@ -1157,12 +1213,13 @@ class EpicsCfg:
         # Process output files
         cfg_outputfiles = cfg_file_root.findall('ns:outputfile', ns)
         if not cfg_outputfiles:
-            self.logger.write('No output files are defined in ' + self.file_path)
-            sys.exit(0)
+            self.logger.write(AsciiFormat.error + 'No output files are defined in ' + self.file_path)
+            sys.exit(1)
         for output_file in cfg_outputfiles:
             if output_file.get('path') is None:
                 self.logger.write(AsciiFormat.error + 'No path is defined for an outputfile. File omitted!')
                 continue
+            self.logger.write('Compiling EPICS database.')
             database = DbFile(output_file.get('path'), logging=self.logger)
             file_autosave = False
             if str(output_file.get('autosave')).lower in ['true', '1']:
@@ -1258,18 +1315,21 @@ class EpicsCfg:
                     if record_autosave:  # Add pv name to autosave list
                         autosave_list.append(record.get('pvName'))
             # Write db-file
-            database.write_db_file(self.file_path)
+            self.logger.write('Writing file: "' + database.file_path + '".')
+            database.write_db_file(self.file_path)  # file_path for comment in db-file, not path to db-file itself.
             # Write autosave .req-file
             if output_file.get('autosavePath') is None:
                 autosave_path = os.path.abspath(output_file.get('path').rsplit(sep='.', maxsplit=1)[0] + '.req')
             else:
                 autosave_path = os.path.abspath(output_file.get('autosavePath'))
             if autosave_list:
+                self.logger.write('Writing autosave file: "' + autosave_path + '".')
                 with open(autosave_path, 'w') as autosave_file:
                     autosave_file.write('\n'.join(autosave_list))
             # Generate documentation for PVs
             docfile_path = os.path.abspath(output_file.get('path').rsplit(sep='.', maxsplit=1)[0] + '_descriptions.txt')
             if doc_list:
+                self.logger.write('Writing PV descriptions to file: "' + docfile_path + '".')
                 with open(docfile_path, 'w') as docfile:
                     docfile.write('Descriptions for PVs defined in "' + self.file_path + '"\n\n'
                                   + '\n'.join(doc_list))
