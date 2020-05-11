@@ -476,23 +476,23 @@ class DbFile(Table):
         else:  # For unforeseen cases
             raise RuntimeError('Something has gone wrong!')
 
-    def _remove_macros(self, input: str) -> str:
+    def _remove_macros(self, in_str: str) -> str:
         """
         Recursively remove Macros from input
 
-        :param input: String to remove macros from.
-        :type input: str
+        :param in_str: String to remove macros from.
+        :type in_str: str
         :return: String with macro found first, removed.
         :rtype: str
         """
-        if not isinstance(input, str):
+        if not isinstance(in_str, str):
             raise TypeError('Attribute of method "_remove_macros" has to be of type string!')
-        open_pos = input.find('$(')
+        open_pos = in_str.find('$(')
         if open_pos == -1:  # End recursion
-            return input
+            return in_str
         else:
-            close_pos = input.find(')', open_pos) + 1
-            output = input[:open_pos] + input[close_pos:]
+            close_pos = in_str.find(')', open_pos) + 1
+            output = in_str[:open_pos] + in_str[close_pos:]
             return self._remove_macros(output)
 
     def add(self, record: Dict[str, Any]):
