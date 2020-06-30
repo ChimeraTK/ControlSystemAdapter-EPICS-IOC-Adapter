@@ -931,15 +931,15 @@ class EpicsCfg:
                                      'lso': 'true',
                                      'lsi': 'false'}
         # Determine value of SCAN field, depending on record type
-        pv_scan_determination = {'int64out': '.5 seconds',
+        pv_scan_determination = {'int64out': '.5 second',
                                  'int64in': 'Passive',
-                                 'ao': '.5 seconds',
+                                 'ao': '.5 second',
                                  'ai': 'Passive',
-                                 'longout': '.5 seconds',
+                                 'longout': '.5 second',
                                  'longin': 'Passive',
-                                 'aao': '.5 seconds',
+                                 'aao': '.5 second',
                                  'aai': 'Passive',
-                                 'lso': '.5 seconds',
+                                 'lso': '.5 second',
                                  'lsi': 'Passive'}
         pvs = Table(['pvName', 'devicePath', 'recordType', 'autosave', 'fields'])
         # Generate aliases from xml path
