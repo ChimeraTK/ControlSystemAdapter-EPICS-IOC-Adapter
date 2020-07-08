@@ -1330,7 +1330,7 @@ class EpicsCfg:
             if autosave_list:
                 self.logger.write('Writing autosave file: "' + autosave_path + '".')
                 with open(autosave_path, 'w') as autosave_file:
-                    autosave_file.write('\n'.join(autosave_list))
+                    autosave_file.write('\n'.join(autosave_list) + '\n')
             # Generate documentation for PVs
             docfile_path = os.path.abspath(output_file.get('path').rsplit(sep='.', maxsplit=1)[0] + '_descriptions.txt')
             if doc_list:
