@@ -28,17 +28,25 @@ configure_file(ioc/CONFIG_SITE.in ${PROJECT_BINARY_DIR}/iocCONFIG_SITE)
 
 # build EPICS
 add_custom_target(${PROJECT_NAME}-epics ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildEpics ${CMAKE_CURRENT_SOURCE_DIR}/epics-base
-                                            WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+                                            WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+                                            BYPRODUCTS ${PROJECT_BINARY_DIR}/libs/libdbRecStd.a
+                                                       ${PROJECT_BINARY_DIR}/libs/libdbCore.a 
+                                                       ${PROJECT_BINARY_DIR}/libs/libca.a 
+                                                       ${PROJECT_BINARY_DIR}/libs/libcas.a 
+                                                       ${PROJECT_BINARY_DIR}/libs/libCom.a
+                                                       ${PROJECT_BINARY_DIR}/libs/libgdd.a)
 
 # build autosave
 add_custom_target(${PROJECT_NAME}-autosave ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAutosave ${CMAKE_CURRENT_SOURCE_DIR}/plugins/autosave
                                                 WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-                                                DEPENDS ${PROJECT_NAME}-epics)
+                                                DEPENDS ${PROJECT_NAME}-epics
+                                                BYPRODUCTS ${PROJECT_BINARY_DIR}/libs/libautosave.a)
 
 # build the ControlSystemAdapter-EPICS
 add_custom_target(${PROJECT_NAME}-adapter ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAdapter ${CMAKE_CURRENT_SOURCE_DIR}/ChimeraTK-ControlSystemAdapter-EPICS ${ChimeraTK-ControlSystemAdapter_PREFIX}
                                               WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-                                              DEPENDS ${PROJECT_NAME}-autosave)
+                                              DEPENDS ${PROJECT_NAME}-autosave
+                                              BYPRODUCTS ${PROJECT_BINARY_DIR}/libs/libChimeraTK-ControlSystemAdapter-EPICS.a)
 
 # build the IOC
 set(iocSources ${PROJECT_BINARY_DIR}/src/ChimeraTKMain.cpp ${PROJECT_BINARY_DIR}/src/ChimeraTK_registerRecordDeviceDriver.cpp)
