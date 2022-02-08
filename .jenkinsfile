@@ -1,2 +1,2 @@
 @Library('ChimeraTK') _
-buildTestDeploy(['ChimeraTK-ControlSystemAdapter'])
+buildTestDeploy(['ChimeraTK/ControlSystemAdapter'], 'https://github.com/ChimeraTK/ControlSystemAdapter-EPICS-IOC-Adapter')
