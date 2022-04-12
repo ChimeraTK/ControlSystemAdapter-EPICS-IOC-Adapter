@@ -7,7 +7,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${C
 
 set(${PROJECT_NAME}_MAJOR_VERSION 01)
 set(${PROJECT_NAME}_MINOR_VERSION 02)
-set(${PROJECT_NAME}_PATCH_VERSION 04)
+set(${PROJECT_NAME}_PATCH_VERSION 05)
 include(cmake/set_version_numbers.cmake)
 
 add_dependency(ChimeraTK-ControlSystemAdapter REQUIRED)
