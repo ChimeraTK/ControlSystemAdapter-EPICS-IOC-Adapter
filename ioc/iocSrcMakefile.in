@@ -19,9 +19,15 @@ ChimeraTK_DBD += base.dbd
 
 # Include dbd files from all support applications:
 ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/autosave/dbd/asSupport.dbd
+ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/aCalcoutRecord.dbd
+ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/calcSupport.dbd
+ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/sCalcoutRecord.dbd
+ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/sseqRecord.dbd
+ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/transformRecord.dbd
 
 # Add all the support libraries needed by this IOC
 ChimeraTK_LIBS += autosave
+ChimeraTK_LIBS += calc
 
 # ChimeraTK_registerRecordDeviceDriver.cpp derives from ChimeraTK.dbd
 ChimeraTK_SRCS += ChimeraTK_registerRecordDeviceDriver.cpp
