@@ -27,6 +27,7 @@
 #MYMODULE = $(MODULES)/my-module
 CHIMERATK_EPICS=${PROJECT_BINARY_DIR}/adapter
 AUTOSAVE=${PROJECT_BINARY_DIR}/autosave
+CALC=${PROJECT_BINARY_DIR}/calc
 
 # If using the sequencer, point SNCSEQ at its top directory:
 #SNCSEQ = $(MODULES)/seq-ver

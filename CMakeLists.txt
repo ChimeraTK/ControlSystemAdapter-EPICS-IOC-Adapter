@@ -1,5 +1,5 @@
 PROJECT(ChimeraTK-ControlSystemAdapter-EPICS-IOC-Adapter)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5)
 
 include(cmake/add_dependency.cmake)
 
@@ -38,9 +38,15 @@ add_custom_target(${PROJECT_NAME}-epics ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/
 
 # build autosave
 add_custom_target(${PROJECT_NAME}-autosave ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAutosave ${CMAKE_CURRENT_SOURCE_DIR}/plugins/autosave
-                                                WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-                                                DEPENDS ${PROJECT_NAME}-epics
-                                                BYPRODUCTS ${PROJECT_BINARY_DIR}/libs/libautosave.a)
+                                               WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+                                               DEPENDS ${PROJECT_NAME}-epics
+                                               BYPRODUCTS ${PROJECT_BINARY_DIR}/libs/libautosave.a)
+
+# build calc
+add_custom_target(${PROJECT_NAME}-calc ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildCalc ${CMAKE_CURRENT_SOURCE_DIR}/plugins/calc
+                                           WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+                                           DEPENDS ${PROJECT_NAME}-epics
+                                           BYPRODUCTS ${PROJECT_BINARY_DIR}/libs/libcalc.a)
 
 # build the ControlSystemAdapter-EPICS
 add_custom_target(${PROJECT_NAME}-adapter ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/buildAdapter ${CMAKE_CURRENT_SOURCE_DIR}/ChimeraTK-ControlSystemAdapter-EPICS ${ChimeraTK-ControlSystemAdapter_PREFIX}
@@ -64,6 +70,7 @@ include_directories(${PROJECT_BINARY_DIR}/epics-base/include/os/Linux)
 include_directories(${PROJECT_BINARY_DIR}/epics-base/include/compiler/gcc)
 
 target_link_libraries(${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libcalc.a)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libautosave.a)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libdbRecStd.a)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_BINARY_DIR}/libs/libdbCore.a)
