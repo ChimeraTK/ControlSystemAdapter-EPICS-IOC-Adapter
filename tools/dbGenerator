@@ -868,7 +868,8 @@ class EpicsCfg:
                               'uint8': 'UCHAR',
                               'double': 'DOUBLE',
                               'float': 'FLOAT',
-                              'string': 'STRING'}
+                              'string': 'STRING',
+                              'Boolean': 'BOOL'}
         # Dictionary to convert "direction" to EPICS IN/OUT
         pv_direction_determination = {'control_system_to_application': 'OUT',
                                       'control_system_to_application_with_return': 'OUT',
@@ -886,6 +887,7 @@ class EpicsCfg:
                                  'INPFalseCHAR': 'longin',
                                  'INPFalseUCHAR': 'longin',
                                  'INPFalseSTRING': 'lsi',
+                                 'INPFalseBOOL': 'bi',
                                  'INPTrueINT64': 'aai',
                                  'INPTrueUINT64': 'aai',
                                  'INPTrueFLOAT': 'aai',
@@ -897,6 +899,7 @@ class EpicsCfg:
                                  'INPTrueCHAR': 'aai',
                                  'INPTrueUCHAR': 'aai',
                                  'INPTrueSTRING': 'aai',
+                                 'INPTrueBOOL': 'mbbiDirect',
                                  'OUTFalseINT64': 'int64out',
                                  'OUTFalseUINT64': 'int64out',
                                  'OUTFalseFLOAT': 'ao',
@@ -908,6 +911,7 @@ class EpicsCfg:
                                  'OUTFalseCHAR': 'longout',
                                  'OUTFalseUCHAR': 'longout',
                                  'OUTFalseSTRING': 'lso',
+                                 'OUTFalseBOOL': 'bo',
                                  'OUTTrueINT64': 'aao',
                                  'OUTTrueUINT64': 'aao',
                                  'OUTTrueFLOAT': 'aao',
@@ -918,7 +922,8 @@ class EpicsCfg:
                                  'OUTTrueULONG': 'aao',
                                  'OUTTrueCHAR': 'aao',
                                  'OUTTrueUCHAR': 'aao',
-                                 'OUTTrueSTRING': 'aao'}
+                                 'OUTTrueSTRING': 'aao',
+                                 'OUTTrueBOOL': 'mbboDirect'}
         # Dictionary to determine autosave based on record type
         pv_autosave_determination = {'int64out': 'true',
                                      'int64in': 'false',
@@ -929,7 +934,11 @@ class EpicsCfg:
                                      'aao': 'false',
                                      'aai': 'false',
                                      'lso': 'true',
-                                     'lsi': 'false'}
+                                     'lsi': 'false',
+                                     'bo': 'true',
+                                     'bi': 'false',
+                                     'mbboDirect': 'true',
+                                     'mbbiDirect': 'false'}
         # Determine value of SCAN field, depending on record type
         pv_scan_determination = {'int64out': 'Passive',
                                  'int64in': '1 second',
@@ -940,7 +949,11 @@ class EpicsCfg:
                                  'aao': 'Passive',
                                  'aai': '1 second',
                                  'lso': 'Passive',
-                                 'lsi': '1 second'}
+                                 'lsi': '1 second',
+                                 'bo': 'Passive',
+                                 'bi': '1 second',
+                                 'mbboDirect': 'Passive',
+                                 'mbbiDirect': '1 second'}
         pvs = Table(['pvName', 'devicePath', 'recordType', 'autosave', 'fields'])
         # Generate aliases from xml path
         gen_log.write('Generate aliases')
@@ -955,7 +968,11 @@ class EpicsCfg:
             aliases[path] = alias_list
         gen_log.write('Compile data from xml.')
         for entry in xml_source:  # Build database
-            try:
+            if entry['value_type'] in ['Void', 'unknown']:  # Skip Void-Type/Unknown Variables/Registers
+                gen_log.write(entry['variablePath'] + entry['variableName'] + ' is of type ' + entry['value_type'] +
+                              ': No record was created!')
+                continue
+            try:  # Try to resolve aliases
                 pv_device_address = '+{' + ''.join(aliases[entry['variablePath']]) + '}' + entry['variableName']
             except KeyError:
                 gen_log.write('No alias found for ' + str(entry['variablePath']) + '! Using full xml path instead!')
@@ -1000,7 +1017,22 @@ class EpicsCfg:
                         'INP': '@$(APP) ' + '+{:address}',
                         'EGU': '+{:unit}',
                         'FTVL': '+{:value_type}',
-                        'NELM': '+{:numberOfElements}'}
+                        'NELM': '+{:numberOfElements}'},
+                'bo': {'SCAN': pv_scan_determination[pv_recordtype],
+                       'OUT': '@$(APP) +{:address}',
+                       'ZNAM': 'False',
+                       'ONAM': 'True',
+                       'PINI': '1'},
+                'bi': {'SCAN': pv_scan_determination[pv_recordtype],
+                       'INP': '@$(APP) +{:address}',
+                       'ZNAM': 'False',
+                       'ONAM': 'True'},
+                'mbboDirect': {'SCAN': pv_scan_determination[pv_recordtype],
+                               'OUT': '@$(APP) +{:address}',
+                               'NOBT': '+{:numberOfElements}'},
+                'mbbiDirect': {'SCAN': pv_scan_determination[pv_recordtype],
+                               'INP': '@$(APP) +{:address}',
+                               'NOBT': '+{:numberOfElements}'}
             }
             if macro is not None:  # Construct macro
                 pv_macro = '$(' + macro + ')'
