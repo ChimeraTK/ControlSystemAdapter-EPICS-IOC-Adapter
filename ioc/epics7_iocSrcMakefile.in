@@ -11,7 +11,6 @@ include $(TOP)/configure/CONFIG
 PROD_IOC = ChimeraTK
 # ChimeraTK.dbd will be created and installed
 DBD += ChimeraTK.dbd
-#DBD += ${PROJECT_BINARY_DIR}/autosave/dbd/asSupport.dbd
 
 
 # ChimeraTK.dbd will be made up from these files:
@@ -25,9 +24,19 @@ ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/sCalcoutRecord.dbd
 ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/sseqRecord.dbd
 ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/transformRecord.dbd
 
+# Include dbd files for PVAccess
+ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/epics-base/dbd/PVAClientRegister.dbd
+ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/epics-base/dbd/PVAServerRegister.dbd
+ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/epics-base/dbd/qsrv.dbd
+
 # Add all the support libraries needed by this IOC
 ChimeraTK_LIBS += autosave
 ChimeraTK_LIBS += calc
+ChimeraTK_LIBS += qsrv
+ChimeraTK_LIBS += nt
+ChimeraTK_LIBS += pvaClient
+ChimeraTK_LIBS += pvDatabase
+ChimeraTK_LIBS += $(EPICS_BASE_PVA_CORE_LIBS)
 
 # ChimeraTK_registerRecordDeviceDriver.cpp derives from ChimeraTK.dbd
 ChimeraTK_SRCS += ChimeraTK_registerRecordDeviceDriver.cpp
