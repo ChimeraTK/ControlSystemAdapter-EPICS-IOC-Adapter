@@ -10,3 +10,8 @@
 [submodule "plugins/calc"]
 	path = plugins/calc
 	url = https://github.com/epics-modules/calc.git
+[submodule "epics7-base"]
+	path = epics7-base
+	url = https://git.launchpad.net/epics-base
+	branch = 7.0
+        fetchRecurseSubmodules = true
