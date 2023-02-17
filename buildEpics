@@ -26,6 +26,14 @@ if [ ! -f "${PROJECT_BINARY_DIR}/epicsSourceLinked" ]; then
   touch "${PROJECT_BINARY_DIR}/epicsSourceLinked"
 fi
 
+# Replacing the Symlink of the template base and ext Makefiles for EPICS7 with modified copies
+if [[ ${EPICS_SOURCE} =~ .*/epics7-base ]]; then
+  rm "${PROJECT_BINARY_DIR}/epics-base/src/template/base/Makefile"
+  sed -e '/top\/\.gitignore/d' "${EPICS_SOURCE}/src/template/base/Makefile" > "${EPICS_BASE}/src/template/base/Makefile"
+  rm "${PROJECT_BINARY_DIR}/epics-base/src/template/ext/Makefile"
+  sed -e '/top\/\.gitignore/d' "${EPICS_SOURCE}/src/template/ext/Makefile" > "${EPICS_BASE}/src/template/ext/Makefile"
+fi
+
 echo "Build epics-base libraries..."
 cd "${EPICS_BASE}"
 make -j5 USR_CFLAGS=-w USR_CXXFLAGS=-w
