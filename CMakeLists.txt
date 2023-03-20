@@ -22,7 +22,7 @@ set(${PROJECT_NAME}_MINOR_VERSION 00)
 set(${PROJECT_NAME}_PATCH_VERSION 01)
 include(cmake/set_version_numbers.cmake)
 
-add_dependency(ChimeraTK-ControlSystemAdapter REQUIRED)
+add_dependency(ChimeraTK-ControlSystemAdapter 02.05 REQUIRED)
 
 find_package(readline REQUIRED)
 # EPICS 7 requires the Yet Another JSON Library
