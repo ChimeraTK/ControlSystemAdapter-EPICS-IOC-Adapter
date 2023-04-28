@@ -13,16 +13,14 @@ else()
                       "-DEPICS_VERSION=7 to build against EPICS ver. 7.02")
 endif()
 
-include(cmake/add_dependency.cmake)
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
 
 set(${PROJECT_NAME}_MAJOR_VERSION 02)
-set(${PROJECT_NAME}_MINOR_VERSION 00)
-set(${PROJECT_NAME}_PATCH_VERSION 01)
+set(${PROJECT_NAME}_MINOR_VERSION 01)
+set(${PROJECT_NAME}_PATCH_VERSION 00)
 include(cmake/set_version_numbers.cmake)
 
-add_dependency(ChimeraTK-ControlSystemAdapter 02.05 REQUIRED)
+find_package(ChimeraTK-ControlSystemAdapter 02.06 REQUIRED)
 
 find_package(readline REQUIRED)
 # EPICS 7 requires the Yet Another JSON Library
@@ -32,10 +30,6 @@ endif()
 
 # set directory to gather all resulting libraries
 set(PROJECT_LIB_DIR ${PROJECT_BINARY_DIR}/lib)
-
-# configure files required to build the ControlSystemAdapter-EPICS
-list(GET ChimeraTK-ControlSystemAdapter_INCLUDE_DIRS 0 ChimeraTK-ControlSystemAdapter_INCLUDE_DIR)
-list(GET ChimeraTK-ControlSystemAdapter_LIBRARY_DIRS 0 ChimeraTK-ControlSystemAdapter_LIBRARY_DIR)
 
 # generate a list of all epics-base libraries, depending on epics version
 set(epics_BASE_LIBS ${PROJECT_LIB_DIR}/libdbRecStd.a
@@ -105,34 +99,35 @@ include_directories(${PROJECT_BINARY_DIR}/epics-base/include)
 include_directories(${PROJECT_BINARY_DIR}/epics-base/include/os/Linux)
 include_directories(${PROJECT_BINARY_DIR}/epics-base/include/compiler/gcc)
 
-target_link_libraries(${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} ${PROJECT_LIB_DIR}/libautosave.a)
-target_link_libraries(${PROJECT_NAME} ${PROJECT_LIB_DIR}/libcalc.a)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_LIB_DIR}/libautosave.a)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_LIB_DIR}/libcalc.a)
 foreach(EPICS_BASE_LIB IN LISTS ${EPICS_VER}_BASE_LIBS)
-  target_link_libraries(${PROJECT_NAME} ${EPICS_BASE_LIB})
+  target_link_libraries(${PROJECT_NAME} PUBLIC ${EPICS_BASE_LIB})
 endforeach()
-target_link_libraries(${PROJECT_NAME} ${PROJECT_LIB_DIR}/libChimeraTK-ControlSystemAdapter-EPICS.a)
-target_link_libraries(${PROJECT_NAME} ${readline_LIBRARY})
+target_link_libraries(${PROJECT_NAME} PRIVATE ChimeraTK::ChimeraTK-ControlSystemAdapter)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIB_DIR}/libChimeraTK-ControlSystemAdapter-EPICS.a)
+target_link_libraries(${PROJECT_NAME} PRIVATE readline)
 
 if(EPICS_VER STREQUAL "epics7")
-  target_link_libraries(${PROJECT_NAME} ${libYajl_LIBRARY})
+  #NOTICE Due to https://github.com/lloyd/yajl/issues/209 the correct linker flag is -lyajl_s.
+  #TODO If this issue is resolved, the library might have to be changed from yail_s to yajl!
+  target_link_libraries(${PROJECT_NAME} PUBLIC yajl_s)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
-set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS} -Wl,--no-as-needed")
+#set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS} -Wl,--no-as-needed")
+#target_compile_options(${PROJECT_NAME} PRIVATE "-Wl,--no-as-needed")
 
 # do not remove runtime path of the library when installing
 set_property(TARGET ${PROJECT_NAME} PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # Install the library and a template directory structure for IOCs
-install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
+include(GNUInstallDirs)
+install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}Targets LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${PROJECT_BINARY_DIR}/ioc/dbd/ChimeraTK.dbd DESTINATION share/${PROJECT_NAME}/iocTemplate/dbd)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/iocTemplate/iocBoot/iocChimeraTKApp/st.cmd DESTINATION share/${PROJECT_NAME}/iocTemplate/iocBoot/iocChimeraTKApp)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/iocTemplate/db/readme.txt DESTINATION share/${PROJECT_NAME}/iocTemplate/db)
 
-set(${PROJECT_NAME}_INCLUDE_DIRS "")
-set(${PROJECT_NAME}_LIBRARIES "${PROJECT_NAME} ${ChimeraTK-ControlSystemAdapter_LIBRARIES}")
-set(${PROJECT_NAME}_LIBRARY_DIRS "${CMAKE_INSTALL_PREFIX}/lib")
-set(${PROJECT_NAME}_CXX_FLAGS "")
-set(${PROJECT_NAME}_LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS} -Wl,--no-as-needed")
+set(PROVIDES_EXPORTED_TARGETS 1)
+list(APPEND ${PROJECT_NAME}_PUBLIC_DEPENDENCIES)
 include(${CMAKE_SOURCE_DIR}/cmake/create_cmake_config_files.cmake)
