@@ -109,14 +109,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIB_DIR}/libChimeraTK-Co
 target_link_libraries(${PROJECT_NAME} PRIVATE readline)
 
 if(EPICS_VER STREQUAL "epics7")
-  #NOTICE Due to https://github.com/lloyd/yajl/issues/209 the correct linker flag is -lyajl_s.
-  #TODO If this issue is resolved, the library might have to be changed from yail_s to yajl!
+  # NOTICE: Due to https://github.com/lloyd/yajl/issues/209 the correct linker flag is -lyajl_s.
+  # TODO: If this issue is resolved, the library might have to be changed from yail_s to yajl!
   target_link_libraries(${PROJECT_NAME} PUBLIC yajl_s)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
-#set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${ChimeraTK-ControlSystemAdapter_LINKER_FLAGS} -Wl,--no-as-needed")
-#target_compile_options(${PROJECT_NAME} PRIVATE "-Wl,--no-as-needed")
 
 # do not remove runtime path of the library when installing
 set_property(TARGET ${PROJECT_NAME} PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
