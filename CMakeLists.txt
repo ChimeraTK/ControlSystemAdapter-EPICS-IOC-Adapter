@@ -17,7 +17,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${C
 
 set(${PROJECT_NAME}_MAJOR_VERSION 02)
 set(${PROJECT_NAME}_MINOR_VERSION 01)
-set(${PROJECT_NAME}_PATCH_VERSION 00)
+set(${PROJECT_NAME}_PATCH_VERSION 01)
 include(cmake/set_version_numbers.cmake)
 
 find_package(ChimeraTK-ControlSystemAdapter 02.06 REQUIRED)
@@ -99,10 +99,10 @@ include_directories(${PROJECT_BINARY_DIR}/epics-base/include)
 include_directories(${PROJECT_BINARY_DIR}/epics-base/include/os/Linux)
 include_directories(${PROJECT_BINARY_DIR}/epics-base/include/compiler/gcc)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_LIB_DIR}/libautosave.a)
-target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_LIB_DIR}/libcalc.a)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIB_DIR}/libautosave.a)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIB_DIR}/libcalc.a)
 foreach(EPICS_BASE_LIB IN LISTS ${EPICS_VER}_BASE_LIBS)
-  target_link_libraries(${PROJECT_NAME} PUBLIC ${EPICS_BASE_LIB})
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${EPICS_BASE_LIB})
 endforeach()
 target_link_libraries(${PROJECT_NAME} PRIVATE ChimeraTK::ChimeraTK-ControlSystemAdapter)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIB_DIR}/libChimeraTK-ControlSystemAdapter-EPICS.a)
@@ -111,7 +111,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE readline)
 if(EPICS_VER STREQUAL "epics7")
   # NOTICE: Due to https://github.com/lloyd/yajl/issues/209 the correct linker flag is -lyajl_s.
   # TODO: If this issue is resolved, the library might have to be changed from yail_s to yajl!
-  target_link_libraries(${PROJECT_NAME} PUBLIC yajl_s)
+  target_link_libraries(${PROJECT_NAME} PRIVATE yajl_s)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
