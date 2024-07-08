@@ -17,17 +17,17 @@ DBD += ChimeraTK.dbd
 ChimeraTK_DBD += base.dbd
 
 # Include dbd files from all support applications:
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/autosave/dbd/asSupport.dbd
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/aCalcoutRecord.dbd
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/calcSupport.dbd
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/sCalcoutRecord.dbd
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/sseqRecord.dbd
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/calc/dbd/transformRecord.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/asSupport.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/aCalcoutRecord.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/calcSupport.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/sCalcoutRecord.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/sseqRecord.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/transformRecord.dbd
 
 # Include dbd files for PVAccess
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/epics-base/dbd/PVAClientRegister.dbd
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/epics-base/dbd/PVAServerRegister.dbd
-ChimeraTK_DBD += ${PROJECT_BINARY_DIR}/epics-base/dbd/qsrv.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/PVAClientRegister.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/PVAServerRegister.dbd
+ChimeraTK_DBD += ${EPICS_BASE}/dbd/qsrv.dbd
 
 # Add all the support libraries needed by this IOC
 ChimeraTK_LIBS += autosave
@@ -63,4 +63,3 @@ ChimeraTK_SYS_LIBS += ChimeraTK-ControlSystemAdapter
 include $(TOP)/configure/RULES
 #----------------------------------------
 #  ADD RULES AFTER THIS LINE
-

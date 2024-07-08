@@ -26,14 +26,14 @@
 #MODULES = /path/to/modules
 #MYMODULE = $(MODULES)/my-module
 CHIMERATK_EPICS=${PROJECT_BINARY_DIR}/adapter
-AUTOSAVE=${PROJECT_BINARY_DIR}/autosave
-CALC=${PROJECT_BINARY_DIR}/calc
+AUTOSAVE=${EPICS_BASE}
+CALC=${EPICS_BASE}
 
 # If using the sequencer, point SNCSEQ at its top directory:
 #SNCSEQ = $(MODULES)/seq-ver
 
 # EPICS_BASE should appear last so earlier modules can override stuff:
-EPICS_BASE = ${PROJECT_BINARY_DIR}/epics-base
+EPICS_BASE = ${EPICS_BASE}
 
 # Set RULES here if you want to use build rules from somewhere
 # other than EPICS_BASE:
@@ -43,4 +43,3 @@ EPICS_BASE = ${PROJECT_BINARY_DIR}/epics-base
 # without having to modify the configure/RELEASE file itself.
 -include $(TOP)/../RELEASE.local
 -include $(TOP)/configure/RELEASE.local
-
