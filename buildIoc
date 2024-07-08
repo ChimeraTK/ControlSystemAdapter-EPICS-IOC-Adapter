@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 PROJECT_BINARY_DIR="`pwd`"
-EPICS_BASE="${PROJECT_BINARY_DIR}/epics-base"
+EPICS_BASE="$1"
 
 # Determine architecture of the build
 EPICS_ARCH=`grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//'`
@@ -28,4 +28,3 @@ mkdir -p "${PROJECT_BINARY_DIR}/src"
 cp "${PROJECT_BINARY_DIR}/ioc/ChimeraTKApp/src/"*.cpp "${PROJECT_BINARY_DIR}/src"
 cp "${PROJECT_BINARY_DIR}/ioc/ChimeraTKApp/src/O.${EPICS_ARCH}/"*.cpp "${PROJECT_BINARY_DIR}/src"
 chmod u+w -R "${PROJECT_BINARY_DIR}/src"
-

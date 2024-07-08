@@ -2,8 +2,13 @@
 
 ADAPTER_SOURCE="$1"
 CSA_PREFIX="$2"
+EPICS_BASE="$3"
 PROJECT_BINARY_DIR="`pwd`"
-EPICS_BASE="${PROJECT_BINARY_DIR}/epics-base"
+
+echo "ADAPTER_SOURCE=${ADAPTER_SOURCE}"
+echo "CSA_PREFIX=${CSA_PREFIX}"
+echo "EPICS_BASE=${EPICS_BASE}"
+echo "PROJECT_BINARY_DIR=${PROJECT_BINARY_DIR}"
 
 # Determine architecture of the build
 EPICS_ARCH=`grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//'`
@@ -43,4 +48,3 @@ make -j5
 mkdir -p "${PROJECT_BINARY_DIR}/lib"
 cp "${PROJECT_BINARY_DIR}/adapter/lib/${EPICS_ARCH}/"*.a "${PROJECT_BINARY_DIR}/lib"
 chmod u+w -R "${PROJECT_BINARY_DIR}/lib"
-
