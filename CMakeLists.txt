@@ -1,21 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-# Change project name, based on EPICS version
-OPTION(EPICS_VERSION "Select major version of EPICS to build (3 or 7)")
-
-if(NOT EPICS_VERSION)
-  set(EPICS_VERSION "7")
-endif()
-
-if(EPICS_VERSION STREQUAL "3")
-  project(ChimeraTK-ControlSystemAdapter-EPICS-IOC-Adapter)
-elseif(EPICS_VERSION STREQUAL "7")
-  project(ChimeraTK-ControlSystemAdapter-EPICS7-IOC-Adapter)
-else()
-  message(FATAL_ERROR "EPICS version must be defined! Please pass to cmake command line one of the following:\n"
-    "-DEPICS_VERSION=3 to build against EPICS ver. 3.15\n"
-    "-DEPICS_VERSION=7 to build against EPICS ver. 7.02")
-endif()
+project(ChimeraTK-ControlSystemAdapter-EPICS-IOC-Adapter)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
 
@@ -25,15 +10,9 @@ set(${PROJECT_NAME}_PATCH_VERSION 01)
 include(cmake/set_version_numbers.cmake)
 
 find_package(ChimeraTK-ControlSystemAdapter 02.06 REQUIRED)
-find_package(ChimeraTK-EPICS${EPICS_VERSION} REQUIRED)
-get_target_property(EPICS_BASE ChimeraTK::EPICS${EPICS_VERSION} INTERFACE_EPICS_BASE)
-
-find_package(readline REQUIRED)
-
-# EPICS 7 requires the Yet Another JSON Library
-if(EPICS_VERSION STREQUAL "7")
-  find_package(libYajl REQUIRED)
-endif()
+find_package(ChimeraTK-EPICS REQUIRED)
+get_target_property(EPICS_BASE ChimeraTK::EPICS INTERFACE_EPICS_BASE)
+get_target_property(EPICS_VERSION ChimeraTK::EPICS INTERFACE_EPICS_VERSION)
 
 find_program(PERL perl REQUIRED)
 
@@ -64,7 +43,7 @@ add_custom_target(${PROJECT_NAME}-ioc ALL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/bu
 add_library(${PROJECT_NAME} SHARED ${iocSources})
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}-ioc)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ChimeraTK::EPICS${EPICS_VERSION})
+target_link_libraries(${PROJECT_NAME} PRIVATE ChimeraTK::EPICS)
 target_link_libraries(${PROJECT_NAME} PRIVATE ChimeraTK::ChimeraTK-ControlSystemAdapter)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIB_DIR}/libChimeraTK-ControlSystemAdapter-EPICS.a)
 
