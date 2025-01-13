@@ -44,7 +44,7 @@ add_library(${PROJECT_NAME} SHARED ${iocSources})
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}-ioc)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ChimeraTK::EPICS)
-target_link_libraries(${PROJECT_NAME} PRIVATE ChimeraTK::ChimeraTK-ControlSystemAdapter)
+target_link_libraries(${PROJECT_NAME} PUBLIC ChimeraTK::ChimeraTK-ControlSystemAdapter)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIB_DIR}/libChimeraTK-ControlSystemAdapter-EPICS.a)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
