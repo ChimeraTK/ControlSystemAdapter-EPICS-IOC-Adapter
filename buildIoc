@@ -1,10 +1,10 @@
 #!/bin/bash -e
 
-PROJECT_BINARY_DIR="`pwd`"
+PROJECT_BINARY_DIR="$(pwd)"
 EPICS_BASE="$1"
 
 # Determine architecture of the build
-EPICS_ARCH=`grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//'`
+EPICS_ARCH=$(grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//')
 
 # Switch to subfolder to build ioc
 echo "Creating IOC template..."

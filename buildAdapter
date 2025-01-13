@@ -3,7 +3,7 @@
 ADAPTER_SOURCE="$1"
 CSA_PREFIX="$2"
 EPICS_BASE="$3"
-PROJECT_BINARY_DIR="`pwd`"
+PROJECT_BINARY_DIR="$(pwd)"
 
 echo "ADAPTER_SOURCE=${ADAPTER_SOURCE}"
 echo "CSA_PREFIX=${CSA_PREFIX}"
@@ -11,11 +11,11 @@ echo "EPICS_BASE=${EPICS_BASE}"
 echo "PROJECT_BINARY_DIR=${PROJECT_BINARY_DIR}"
 
 # Determine architecture of the build
-EPICS_ARCH=`grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//'`
+EPICS_ARCH=$(grep "^ARCH=" "${EPICS_BASE}/lib/pkgconfig/epics-base.pc" | sed -e 's/^ARCH=//')
 
 # Function links file, generating subfolder if necessary
 makeLink() {
-   mkdir -p `dirname "${PROJECT_BINARY_DIR}/adapter/$1"`
+   mkdir -p "$(dirname "${PROJECT_BINARY_DIR}/adapter/$1")"
    ln -sfn "${ADAPTER_SOURCE}/$1" "${PROJECT_BINARY_DIR}/adapter/$1"
 }
 
@@ -31,7 +31,8 @@ export PATH=${CSA_PREFIX}/bin:${PATH}
 if [ ! -f "${PROJECT_BINARY_DIR}/AdapterSourceLinked" ]; then
   cd "${ADAPTER_SOURCE}/"
   echo "Symlinking adapter source from ${ADAPTER_SOURCE}/ to ${PROJECT_BINARY_DIR}/adapter ..."
-  find -type f -exec bash -c "makeLink {}" \;
+  # Note: The second "makeLink" is the $0 argument to the bash -c call - just used for error messages
+  find . -type f -exec bash -c "makeLink" makeLink {} \;
   touch "${PROJECT_BINARY_DIR}/AdapterSourceLinked"
 fi
 
