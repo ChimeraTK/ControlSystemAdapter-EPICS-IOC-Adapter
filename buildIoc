@@ -12,8 +12,11 @@ mkdir -p "${PROJECT_BINARY_DIR}/ioc"
 cd "${PROJECT_BINARY_DIR}/ioc"
 
 # Run makeBaseApp script to generate IOC Template
-"${EPICS_BASE}/bin/${EPICS_ARCH}/makeBaseApp.pl" -u "$USER" -t ioc ChimeraTK
-"${EPICS_BASE}/bin/${EPICS_ARCH}/makeBaseApp.pl" -u "$USER" -i -t ioc -p ChimeraTK Linux
+# We are passing "ChimeraTK" as user name here, since at least on on Tumbleweed the $USER variable is not set at
+# this point for unclear reasons.
+"${EPICS_BASE}/bin/${EPICS_ARCH}/makeBaseApp.pl" -u "ChimeraTK" -t ioc ChimeraTK
+"${EPICS_BASE}/bin/${EPICS_ARCH}/makeBaseApp.pl" -u "ChimeraTK" -i -t ioc -p ChimeraTK Linux
+
 
 # Copy script generated RELEASE, CONFIG and source file to their aprobiate subfolders
 cp "${PROJECT_BINARY_DIR}/iocRELEASE" "${PROJECT_BINARY_DIR}/ioc/configure/RELEASE"
