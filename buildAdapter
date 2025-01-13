@@ -32,7 +32,7 @@ if [ ! -f "${PROJECT_BINARY_DIR}/AdapterSourceLinked" ]; then
   cd "${ADAPTER_SOURCE}/"
   echo "Symlinking adapter source from ${ADAPTER_SOURCE}/ to ${PROJECT_BINARY_DIR}/adapter ..."
   # Note: The second "makeLink" is the $0 argument to the bash -c call - just used for error messages
-  find . -type f -exec bash -c "makeLink" makeLink {} \;
+  find . -type f -exec bash -c 'makeLink "$1"' makeLink {} \;
   touch "${PROJECT_BINARY_DIR}/AdapterSourceLinked"
 fi
 
