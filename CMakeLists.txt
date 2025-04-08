@@ -19,6 +19,9 @@ find_program(PERL perl REQUIRED)
 # set directory to gather all resulting libraries
 set(PROJECT_LIB_DIR ${PROJECT_BINARY_DIR}/lib)
 
+include(cmake/get_imported_target_cxx_standard.cmake)
+get_imported_target_cxx_standard(ChimeraTK::ChimeraTK-ControlSystemAdapter CXX_STD_COMPILE_FLAG)
+
 configure_file(adapter/CONFIG_SITE.local.in ${PROJECT_BINARY_DIR}/adapterCONFIG_SITE.local)
 configure_file(adapter/RELEASE.local.in ${PROJECT_BINARY_DIR}/adapterRELEASE.local)
 
@@ -49,7 +52,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LIB_DIR}/libChimeraTK-Co
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_FULL_LIBRARY_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
 
-set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-Wl,--no-undefined -Wl,--no-as-needed")
+set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS " -Wl,--no-undefined -Wl,--no-as-needed ")
 
 # do not remove runtime path of the library when installing
 set_property(TARGET ${PROJECT_NAME} PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
