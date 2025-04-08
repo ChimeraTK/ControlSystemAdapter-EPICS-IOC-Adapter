@@ -28,4 +28,4 @@ CHIMERATK_LIB = ${ChimeraTK-ControlSystemAdapter_LIBRARY_DIRS}
 # If the compiler is not expecting C++ 11 code by default, it has to be told
 # to do so.
 
-USR_CXXFLAGS += ${ChimeraTK-ControlSystemAdapter_CXX_FLAGS}
+USR_CXXFLAGS += ${ChimeraTK-ControlSystemAdapter_CXX_FLAGS} ${CXX_STD_COMPILE_FLAG}
