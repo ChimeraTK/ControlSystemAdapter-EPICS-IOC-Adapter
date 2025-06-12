@@ -55,9 +55,6 @@ ChimeraTK_LIBS += $(EPICS_BASE_IOC_LIBS)
 ChimeraTK_DBD += ChimeraTK-ControlSystemAdapter-EPICS.dbd
 ChimeraTK_LIBS += ChimeraTK-ControlSystemAdapter-EPICS
 
-# Add required dependency library of the ChimeraTK-ControlSystemAdapter-EPICS
-ChimeraTK_SYS_LIBS += ChimeraTK-ControlSystemAdapter
-
 #===========================
 
 include $(TOP)/configure/RULES
